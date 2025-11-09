@@ -1,0 +1,77 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { list } from '@vercel/blob';
+import { sql } from '@vercel/postgres';
+
+export async function GET(req: NextRequest) {
+  try {
+    // Check authentication
+    const session = await getServerSession(authOptions);
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Check account status
+    if (session.user.accountStatus === 'suspended' || session.user.accountStatus === 'past_due') {
+      return NextResponse.json({
+        error: 'Account access restricted. Please contact support.'
+      }, { status: 403 });
+    }
+
+    const searchParams = req.nextUrl.searchParams;
+    const folderId = searchParams.get('folderId');
+
+    if (!folderId) {
+      return NextResponse.json({ error: 'Folder ID required' }, { status: 400 });
+    }
+
+    // Get folder permissions
+    const folderResult = await sql`
+      SELECT fp.*, c.company_name
+      FROM file_permissions fp
+      LEFT JOIN companies c ON fp.company_id = c.id
+      WHERE fp.id = ${folderId}
+      AND (
+        fp.folder_type IN ('shared', 'program_files')
+        OR fp.company_id = ${session.user.companyId}
+      )
+    `;
+
+    if (folderResult.rows.length === 0) {
+      return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+    }
+
+    const folder = folderResult.rows[0];
+
+    // List files from Vercel Blob
+    const { blobs } = await list({
+      prefix: folder.blob_prefix,
+      limit: 1000
+    });
+
+    // Format file list
+    const files = blobs.map(blob => ({
+      url: blob.url,
+      pathname: blob.pathname,
+      size: blob.size,
+      uploadedAt: blob.uploadedAt,
+      filename: blob.pathname.split('/').pop()
+    }));
+
+    return NextResponse.json({
+      success: true,
+      folder: {
+        id: folder.id,
+        name: folder.folder_name,
+        type: folder.folder_type,
+        companyName: folder.company_name
+      },
+      files
+    });
+
+  } catch (error) {
+    console.error('List files error:', error);
+    return NextResponse.json({ error: 'Failed to list files' }, { status: 500 });
+  }
+}
