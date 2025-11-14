@@ -25,8 +25,11 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'File URL required' }, { status: 400 });
     }
 
-    // Extract blob path from URL
-    const blobPath = fileUrl.split('/').slice(-2).join('/');
+    // Extract blob path from Vercel Blob URL
+    // URL format: https://[hash].public.blob.vercel-storage.com/[path]
+    const urlParts = fileUrl.split('/');
+    const domainIndex = urlParts.findIndex(part => part.includes('blob.vercel-storage.com'));
+    const blobPath = domainIndex !== -1 ? urlParts.slice(domainIndex + 1).join('/') : fileUrl.split('/').pop() || '';
 
     // Verify user has access to this file path
     const accessCheck = await sql`

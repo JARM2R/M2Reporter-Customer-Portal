@@ -148,8 +148,8 @@ export default function FilesPage() {
   if (!session || !folder) {
     return null;
   }
-
-  const canUpload = session.user.accountStatus === 'active' && folder.type !== 'program_files';
+  const canUpload = session.user.accountStatus === 'active' &&
+    (session.user.role === 'admin' || folder.type !== 'program_files');
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5' }}>
