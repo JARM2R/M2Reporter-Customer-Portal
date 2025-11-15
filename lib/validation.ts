@@ -106,6 +106,7 @@ export const ALLOWED_FILE_TYPES = {
   'application/x-msdownload': '.exe',
   'application/x-msi': '.msi',
   'application/x-ms-installer': '.msi',
+  'application/octet-stream': '.exe', // Generic binary - will validate by extension
 
   // Images (for documentation)
   'image/jpeg': '.jpg',
@@ -123,11 +124,27 @@ export function isValidFileType(mimeType: string, filename: string): {
   valid: boolean;
   error?: string;
 } {
+  // Get file extension
+  const fileExtension = filename.toLowerCase().split('.').pop() || '';
+  const fullExtension = '.' + fileExtension;
+
+  // For generic binary MIME type, validate by extension only
+  if (mimeType === 'application/octet-stream') {
+    const allowedExtensions = ['.exe', '.msi', '.zip', '.mdb'];
+    if (allowedExtensions.includes(fullExtension)) {
+      return { valid: true };
+    }
+    return {
+      valid: false,
+      error: `File type .${fileExtension} not allowed for binary files.`,
+    };
+  }
+
   // Check MIME type
   if (!Object.keys(ALLOWED_FILE_TYPES).includes(mimeType)) {
     return {
       valid: false,
-      error: `File type not allowed. Allowed types: ${Object.values(ALLOWED_FILE_TYPES).join(', ')}`,
+      error: `File type not allowed. Allowed types: PDF, CSV, TXT, XML, XLS, XLSX, DOC, DOCX, MDB, EXE, MSI, JPG, PNG, ZIP`,
     };
   }
 
