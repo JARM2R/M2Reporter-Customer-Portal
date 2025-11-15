@@ -32,15 +32,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
     }
 
-    // Validate file size
-    if (file.size > MAX_FILE_SIZE) {
-      return NextResponse.json({ error: 'File size exceeds 100MB limit' }, { status: 400 });
-    }
-
-    // Validate file type
+     // Validate file type
+    console.log('Upload attempt:', {
+      filename: file.name,
+      mimeType: file.type,
+      size: file.size
+    });
+    
     const fileTypeValidation = isValidFileType(file.type, file.name);
     if (!fileTypeValidation.valid) {
-      return NextResponse.json({ error: fileTypeValidation.error }, { status: 400 });
+      console.log('File type validation failed:', fileTypeValidation.error);
+      return NextResponse.json({ 
+        error: fileTypeValidation.error,
+        debug: { mimeType: file.type, filename: file.name }
+      }, { status: 400 });
     }
 
     // Sanitize filename to prevent path traversal attacks
