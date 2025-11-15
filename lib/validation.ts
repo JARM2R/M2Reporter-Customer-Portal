@@ -87,6 +87,8 @@ export const ALLOWED_FILE_TYPES = {
   'application/pdf': '.pdf',
   'text/csv': '.csv',
   'text/plain': '.txt',
+  'application/xml': '.xml',
+  'text/xml': '.xml',
 
   // Spreadsheets
   'application/vnd.ms-excel': '.xls',
@@ -96,12 +98,22 @@ export const ALLOWED_FILE_TYPES = {
   'application/msword': '.doc',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '.docx',
 
+  // Database Files
+  'application/x-msaccess': '.mdb',
+  'application/vnd.ms-access': '.mdb',
+
+  // Executables & Installers
+  'application/x-msdownload': '.exe',
+  'application/x-msi': '.msi',
+  'application/x-ms-installer': '.msi',
+
   // Images (for documentation)
   'image/jpeg': '.jpg',
   'image/png': '.png',
 
   // Archives
   'application/zip': '.zip',
+  'application/x-zip-compressed': '.zip',
 } as const;
 
 /**
