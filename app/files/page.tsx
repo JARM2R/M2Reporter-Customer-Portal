@@ -3,7 +3,7 @@
 export const dynamic = 'force-dynamic';
 import { useSession } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { upload } from '@vercel/blob/client';
 
 interface FileItem {
   url: string;
@@ -60,41 +60,50 @@ export default function FilesPage() {
     }
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+ const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
 
-    setUploading(true);
-    setUploadError('');
+  setUploading(true);
+  setUploadError('');
 
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('folderType', folder!.type);
-    formData.append('folderId', folderId!);
+  try {
+    // Upload directly to Vercel Blob (bypasses 4.5MB API limit)
+    const blob = await upload(file.name, file, {
+      access: 'public',
+      handleUploadUrl: '/api/files/upload',
+    });
 
-    try {
-      const response = await fetch('/api/files/upload', {
-        method: 'POST',
-        body: formData,
-      });
+    // Save file metadata to database
+    const metadataResponse = await fetch('/api/files/save-metadata', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        folderId: folderId,
+        folderType: folder!.type,
+        filename: file.name,
+        url: blob.url,
+        size: file.size,
+      }),
+    });
 
-      const data = await response.json();
+    const data = await metadataResponse.json();
 
-      if (response.ok && data.success) {
-        await loadFiles(); // Reload file list
-        alert('File uploaded successfully!');
-      } else {
-        setUploadError(data.error || 'Upload failed');
-      }
-    } catch (error) {
-      console.error('Upload error:', error);
-      setUploadError('Upload failed. Please try again.');
-    } finally {
-      setUploading(false);
-      // Reset file input
-      e.target.value = '';
+    if (metadataResponse.ok && data.success) {
+      await loadFiles(); // Reload file list
+      alert('File uploaded successfully!');
+    } else {
+      setUploadError(data.error || 'Failed to save file metadata');
     }
-  };
+  } catch (error) {
+    console.error('Upload error:', error);
+    setUploadError('Upload failed. Please try again.');
+  } finally {
+    setUploading(false);
+    // Reset file input
+    e.target.value = '';
+  }
+};
 
   const handleDownload = async (fileUrl: string, filename: string) => {
     try {
