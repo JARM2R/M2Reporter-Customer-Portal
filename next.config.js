@@ -42,7 +42,7 @@ const nextConfig = {
               "style-src 'self' 'unsafe-inline'", // Required for inline styles
               "img-src 'self' data: https: blob:",
               "font-src 'self' data:",
-              "connect-src 'self' https://vercel.live https://*.vercel-insights.com https://*.pusher.com wss://*.pusher.com", // Vercel analytics and live
+              "connect-src 'self' https://vercel.live https://*.vercel-insights.com https://*.pusher.com wss://*.pusher.com https://vercel.com https://*.vercel-storage.com https://*.public.blob.vercel-storage.com", // Added Vercel Blob domains
               "frame-ancestors 'self'",
               "base-uri 'self'",
               "form-action 'self'",
