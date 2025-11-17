@@ -73,9 +73,7 @@ export default function FilesPage() {
   const blob = await upload(file.name, file, {
   access: 'public',
   handleUploadUrl: '/api/files/upload',
-  options: {
-    addRandomSuffix: true,
-  },
+  addRandomSuffix: true,
 });
 
     // Save file metadata to database
