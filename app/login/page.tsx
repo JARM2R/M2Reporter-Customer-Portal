@@ -100,7 +100,7 @@ export default function LoginPage() {
             />
           </div>
 
-          <div style={{ marginBottom: '25px' }}>
+          <div style={{ marginBottom: '10px' }}>
             <label style={{
               display: 'block',
               marginBottom: '8px',
@@ -124,6 +124,23 @@ export default function LoginPage() {
                 boxSizing: 'border-box'
               }}
             />
+          </div>
+
+          {/* Forgot Password Link */}
+          <div style={{ 
+            marginBottom: '20px',
+            textAlign: 'right'
+          }}>
+            <a
+              href="/forgot-password"
+              style={{
+                color: '#144478',
+                fontSize: '13px',
+                textDecoration: 'none'
+              }}
+            >
+              Forgot Password?
+            </a>
           </div>
 
           {error && (
