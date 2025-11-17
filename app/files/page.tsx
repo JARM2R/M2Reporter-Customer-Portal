@@ -69,34 +69,22 @@ export default function FilesPage() {
   setUploadError('');
 
   try {
-    // Upload directly to Vercel Blob (bypasses 4.5MB API limit)
-const blob = await upload(file.name, file, {
-  access: 'public',
-  handleUploadUrl: '/api/files/upload',
-});
-
-
-    // Save file metadata to database
-    const metadataResponse = await fetch('/api/files/save-metadata', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        folderId: folderId,
-        folderType: folder!.type,
-        filename: file.name,
-        url: blob.url,
-        size: file.size,
-      }),
+    // Get folder prefix from the folder object
+    const blobPrefix = folder.type === 'program_files' 
+      ? 'program-files/' 
+      : folder.type === 'shared'
+      ? 'shared/'
+      : `company-${session.user.companyId}/`;
+    
+    // Upload directly to Vercel Blob with correct prefix
+    const blob = await upload(`${blobPrefix}${file.name}`, file, {
+      access: 'public',
+      handleUploadUrl: '/api/files/upload',
     });
 
-    const data = await metadataResponse.json();
-
-    if (metadataResponse.ok && data.success) {
-      await loadFiles(); // Reload file list
-      alert('File uploaded successfully!');
-    } else {
-      setUploadError(data.error || 'Failed to save file metadata');
-    }
+    // Reload file list
+    await loadFiles();
+    alert('File uploaded successfully!');
   } catch (error) {
     console.error('Upload error:', error);
     setUploadError('Upload failed. Please try again.');
