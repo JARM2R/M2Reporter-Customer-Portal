@@ -59,16 +59,16 @@ export default function AdminPage() {
   });
 
   useEffect(() => {
-    if (status === 'unauthenticated') {
-      router.push('/login');
-    } else if (status === 'authenticated') {
-      if (session?.user?.role !== 'admin') {
-        router.push('/dashboard');
-      } else {
-        loadData();
-      }
+  if (status === 'unauthenticated') {
+    router.replace('/login');
+  } else if (status === 'authenticated') {
+    if (session?.user?.role !== 'admin') {
+      router.replace('/dashboard');
+    } else {
+      loadData();
     }
-  }, [status, session, router]);
+  }
+}, [status, session, router]);
 
   const loadData = async () => {
     try {
@@ -176,17 +176,15 @@ export default function AdminPage() {
     }
   };
 
-  if (status === 'loading' || loading) {
-    return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div>Loading...</div>
-      </div>
-    );
-  }
+ // Don't show anything until we verify admin access
+if (status === 'loading' || loading || !session || session.user.role !== 'admin') {
+  return (
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f5f5f5' }}>
+      {status === 'loading' || loading ? <div>Loading...</div> : null}
+    </div>
+  );
+}
 
-  if (!session || session.user.role !== 'admin') {
-    return null;
-  }
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5' }}>
