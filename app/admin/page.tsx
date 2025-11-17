@@ -11,20 +11,52 @@ interface Company {
   created_at: string;
 }
 
+interface User {
+  id: number;
+  username: string;
+  email: string;
+  role: string;
+  is_activated: boolean;
+  company_id: number;
+  company_name: string;
+  account_status: string;
+  created_at: string;
+  last_login: string;
+}
+
+interface Folder {
+  id: number;
+  folder_name: string;
+  folder_type: string;
+  blob_prefix: string;
+  company_id: number;
+  company_name: string;
+}
+
 export default function AdminPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  
+  const [activeTab, setActiveTab] = useState<'companies' | 'users' | 'folders'>('companies');
   const [companies, setCompanies] = useState<Company[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [folders, setFolders] = useState<Folder[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // New user form
-  const [showForm, setShowForm] = useState(false);
-  const [selectedCompanyId, setSelectedCompanyId] = useState('');
-  const [email, setEmail] = useState('');
-  const [username, setUsername] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  // Form states
+  const [newCompanyName, setNewCompanyName] = useState('');
+  const [newUser, setNewUser] = useState({
+    username: '',
+    email: '',
+    password: '',
+    companyId: '',
+    role: 'user'
+  });
+  const [newFolder, setNewFolder] = useState({
+    folderName: '',
+    folderType: 'company_specific',
+    companyId: ''
+  });
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -33,71 +65,120 @@ export default function AdminPage() {
       if (session?.user?.role !== 'admin') {
         router.push('/dashboard');
       } else {
-        loadCompanies();
+        loadData();
       }
     }
   }, [status, session, router]);
 
-  const loadCompanies = async () => {
+  const loadData = async () => {
     try {
-      const response = await fetch('/api/admin/companies');
-      const data = await response.json();
-      if (data.success) {
-        setCompanies(data.companies);
-      }
-    } catch (error) {
-      console.error('Failed to load companies:', error);
+      await Promise.all([
+        loadCompanies(),
+        loadUsers(),
+        loadFolders()
+      ]);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleCreateInvite = async (e: React.FormEvent) => {
+  const loadCompanies = async () => {
+    const response = await fetch('/api/admin/companies/list');
+    const data = await response.json();
+    if (data.success) {
+      setCompanies(data.companies);
+    }
+  };
+
+  const loadUsers = async () => {
+    const response = await fetch('/api/admin/users/list');
+    const data = await response.json();
+    if (data.success) {
+      setUsers(data.users);
+    }
+  };
+
+  const loadFolders = async () => {
+    const response = await fetch('/api/admin/folders/list');
+    const data = await response.json();
+    if (data.success) {
+      setFolders(data.folders);
+    }
+  };
+
+  const handleCreateCompany = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-    setSuccess('');
-    setSubmitting(true);
+    
+    const response = await fetch('/api/admin/companies/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ companyName: newCompanyName })
+    });
 
-    try {
-      const response = await fetch('/api/admin/create-invite', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email,
-          username,
-          companyId: parseInt(selectedCompanyId)
-        }),
-      });
+    const data = await response.json();
+    
+    if (data.success) {
+      alert('Company created successfully!');
+      setNewCompanyName('');
+      loadCompanies();
+    } else {
+      alert(data.error || 'Failed to create company');
+    }
+  };
 
-      const data = await response.json();
+  const handleCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    const response = await fetch('/api/admin/users/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        username: newUser.username,
+        email: newUser.email,
+        password: newUser.password,
+        companyId: parseInt(newUser.companyId),
+        role: newUser.role
+      })
+    });
 
-      if (response.ok && data.success) {
-        setSuccess(`Invite sent to ${email}! User can activate at: ${data.inviteUrl}`);
-        setEmail('');
-        setUsername('');
-        setSelectedCompanyId('');
-        setShowForm(false);
-      } else {
-        setError(data.error || 'Failed to create invite');
-      }
-    } catch (error) {
-      console.error('Create invite error:', error);
-      setError('Failed to create invite. Please try again.');
-    } finally {
-      setSubmitting(false);
+    const data = await response.json();
+    
+    if (data.success) {
+      alert('User created successfully!');
+      setNewUser({ username: '', email: '', password: '', companyId: '', role: 'user' });
+      loadUsers();
+    } else {
+      alert(data.error || 'Failed to create user');
+    }
+  };
+
+  const handleCreateFolder = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    const response = await fetch('/api/admin/folders/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        folderName: newFolder.folderName,
+        folderType: newFolder.folderType,
+        companyId: newFolder.companyId ? parseInt(newFolder.companyId) : null
+      })
+    });
+
+    const data = await response.json();
+    
+    if (data.success) {
+      alert('Folder created successfully!');
+      setNewFolder({ folderName: '', folderType: 'company_specific', companyId: '' });
+      loadFolders();
+    } else {
+      alert(data.error || 'Failed to create folder');
     }
   };
 
   if (status === 'loading' || loading) {
     return (
-      <div style={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center'
-      }}>
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <div>Loading...</div>
       </div>
     );
@@ -117,306 +198,463 @@ export default function AdminPage() {
         boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
       }}>
         <div style={{
-          maxWidth: '1200px',
-          margin: '0 auto'
+          maxWidth: '1400px',
+          margin: '0 auto',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
         }}>
-          <h1 style={{ margin: '0', fontSize: '24px' }}>
-            Admin Dashboard
-          </h1>
+          <div>
+            <h1 style={{ margin: '0 0 5px 0', fontSize: '24px' }}>
+              Admin Dashboard
+            </h1>
+            <p style={{ margin: 0, fontSize: '14px', opacity: 0.9 }}>
+              Manage companies, users, and folders
+            </p>
+          </div>
+          <button
+            onClick={() => router.push('/dashboard')}
+            style={{
+              padding: '8px 16px',
+              backgroundColor: 'transparent',
+              color: 'white',
+              border: '1px solid white',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '14px'
+            }}
+          >
+            ← Back to Portal
+          </button>
         </div>
       </header>
 
-      {/* Main Content */}
-      <main style={{
-        maxWidth: '1200px',
-        margin: '0 auto',
-        padding: '40px 20px'
-      }}>
-        {success && (
-          <div style={{
-            backgroundColor: '#d4edda',
-            color: '#155724',
-            padding: '15px',
-            borderRadius: '4px',
-            marginBottom: '20px',
-            border: '1px solid #c3e6cb'
-          }}>
-            {success}
-          </div>
-        )}
-
-        {error && (
-          <div style={{
-            backgroundColor: '#fee',
-            color: '#c33',
-            padding: '15px',
-            borderRadius: '4px',
-            marginBottom: '20px'
-          }}>
-            {error}
-          </div>
-        )}
-
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: '30px'
-        }}>
-          <h2 style={{
-            fontSize: '24px',
-            color: '#144478',
-            margin: 0
-          }}>
-            Create User Invite
-          </h2>
+      <main style={{ maxWidth: '1400px', margin: '0 auto', padding: '40px 20px' }}>
+        {/* Tabs */}
+        <div style={{ display: 'flex', gap: '10px', marginBottom: '30px', borderBottom: '2px solid #ddd' }}>
           <button
-            onClick={() => setShowForm(!showForm)}
+            onClick={() => setActiveTab('companies')}
             style={{
-              padding: '10px 20px',
-              backgroundColor: '#B3CC48',
-              color: '#000',
+              padding: '12px 24px',
+              backgroundColor: activeTab === 'companies' ? '#144478' : 'transparent',
+              color: activeTab === 'companies' ? 'white' : '#144478',
               border: 'none',
-              borderRadius: '4px',
+              borderRadius: '4px 4px 0 0',
               cursor: 'pointer',
-              fontSize: '14px',
+              fontSize: '16px',
               fontWeight: '600'
             }}
           >
-            {showForm ? 'Cancel' : '+ New User'}
+            Companies ({companies.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('users')}
+            style={{
+              padding: '12px 24px',
+              backgroundColor: activeTab === 'users' ? '#144478' : 'transparent',
+              color: activeTab === 'users' ? 'white' : '#144478',
+              border: 'none',
+              borderRadius: '4px 4px 0 0',
+              cursor: 'pointer',
+              fontSize: '16px',
+              fontWeight: '600'
+            }}
+          >
+            Users ({users.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('folders')}
+            style={{
+              padding: '12px 24px',
+              backgroundColor: activeTab === 'folders' ? '#144478' : 'transparent',
+              color: activeTab === 'folders' ? 'white' : '#144478',
+              border: 'none',
+              borderRadius: '4px 4px 0 0',
+              cursor: 'pointer',
+              fontSize: '16px',
+              fontWeight: '600'
+            }}
+          >
+            Folders ({folders.length})
           </button>
         </div>
 
-        {showForm && (
-          <div style={{
-            backgroundColor: 'white',
-            padding: '30px',
-            borderRadius: '8px',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-            marginBottom: '30px'
-          }}>
-            <h3 style={{
-              fontSize: '18px',
-              color: '#144478',
-              marginTop: 0,
-              marginBottom: '20px'
-            }}>
-              Create New User Invite
-            </h3>
+        {/* Companies Tab */}
+        {activeTab === 'companies' && (
+          <div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '30px' }}>
+              {/* Create Company Form */}
+              <div style={{
+                backgroundColor: 'white',
+                padding: '30px',
+                borderRadius: '8px',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+              }}>
+                <h2 style={{ marginTop: 0, color: '#144478' }}>Create New Company</h2>
+                <form onSubmit={handleCreateCompany}>
+                  <div style={{ marginBottom: '20px' }}>
+                    <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600' }}>
+                      Company Name *
+                    </label>
+                    <input
+                      type="text"
+                      value={newCompanyName}
+                      onChange={(e) => setNewCompanyName(e.target.value)}
+                      required
+                      style={{
+                        width: '100%',
+                        padding: '10px',
+                        border: '1px solid #ddd',
+                        borderRadius: '4px',
+                        fontSize: '14px'
+                      }}
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    style={{
+                      padding: '12px 24px',
+                      backgroundColor: '#B3CC48',
+                      color: '#000',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      fontWeight: '600'
+                    }}
+                  >
+                    Create Company
+                  </button>
+                </form>
+              </div>
 
-            <form onSubmit={handleCreateInvite}>
-              <div style={{ marginBottom: '20px' }}>
-                <label style={{
-                  display: 'block',
-                  marginBottom: '8px',
-                  color: '#333',
-                  fontSize: '14px',
-                  fontWeight: '500'
-                }}>
-                  Company
-                </label>
-                <select
-                  value={selectedCompanyId}
-                  onChange={(e) => setSelectedCompanyId(e.target.value)}
-                  required
-                  style={{
-                    width: '100%',
-                    padding: '10px',
-                    border: '1px solid #ddd',
-                    borderRadius: '4px',
-                    fontSize: '14px'
-                  }}
-                >
-                  <option value="">Select a company...</option>
-                  {companies.map(company => (
-                    <option key={company.id} value={company.id}>
-                      {company.company_name} ({company.account_status})
-                    </option>
+              {/* Companies List */}
+              <div style={{
+                backgroundColor: 'white',
+                padding: '30px',
+                borderRadius: '8px',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+              }}>
+                <h2 style={{ marginTop: 0, color: '#144478' }}>Existing Companies</h2>
+                <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                  {companies.map((company) => (
+                    <div
+                      key={company.id}
+                      style={{
+                        padding: '15px',
+                        borderBottom: '1px solid #eee',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center'
+                      }}
+                    >
+                      <div>
+                        <div style={{ fontWeight: '600', marginBottom: '5px' }}>
+                          {company.company_name}
+                        </div>
+                        <div style={{ fontSize: '12px', color: '#666' }}>
+                          Status: {company.account_status} | ID: {company.id}
+                        </div>
+                      </div>
+                    </div>
                   ))}
-                </select>
+                </div>
               </div>
-
-              <div style={{ marginBottom: '20px' }}>
-                <label style={{
-                  display: 'block',
-                  marginBottom: '8px',
-                  color: '#333',
-                  fontSize: '14px',
-                  fontWeight: '500'
-                }}>
-                  Email Address
-                </label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  style={{
-                    width: '100%',
-                    padding: '10px',
-                    border: '1px solid #ddd',
-                    borderRadius: '4px',
-                    fontSize: '14px',
-                    boxSizing: 'border-box'
-                  }}
-                />
-              </div>
-
-              <div style={{ marginBottom: '25px' }}>
-                <label style={{
-                  display: 'block',
-                  marginBottom: '8px',
-                  color: '#333',
-                  fontSize: '14px',
-                  fontWeight: '500'
-                }}>
-                  Username
-                </label>
-                <input
-                  type="text"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  required
-                  style={{
-                    width: '100%',
-                    padding: '10px',
-                    border: '1px solid #ddd',
-                    borderRadius: '4px',
-                    fontSize: '14px',
-                    boxSizing: 'border-box'
-                  }}
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={submitting}
-                style={{
-                  padding: '12px 24px',
-                  backgroundColor: submitting ? '#ccc' : '#144478',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: submitting ? 'not-allowed' : 'pointer',
-                  fontSize: '14px',
-                  fontWeight: '600'
-                }}
-              >
-                {submitting ? 'Creating...' : 'Create Invite'}
-              </button>
-            </form>
+            </div>
           </div>
         )}
 
-        {/* Companies List */}
-        <h2 style={{
-          fontSize: '24px',
-          color: '#144478',
-          marginBottom: '20px'
-        }}>
-          Companies
-        </h2>
-
-        <div style={{
-          backgroundColor: 'white',
-          borderRadius: '8px',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-          overflow: 'hidden'
-        }}>
-          {companies.length === 0 ? (
-            <div style={{
-              padding: '40px',
-              textAlign: 'center',
-              color: '#666'
-            }}>
-              <p>No companies yet.</p>
-            </div>
-          ) : (
-            <table style={{
-              width: '100%',
-              borderCollapse: 'collapse'
-            }}>
-              <thead>
-                <tr style={{
-                  backgroundColor: '#f8f9fa',
-                  borderBottom: '2px solid #dee2e6'
-                }}>
-                  <th style={{
-                    padding: '15px',
-                    textAlign: 'left',
-                    fontWeight: '600',
-                    color: '#333'
-                  }}>
-                    Company Name
-                  </th>
-                  <th style={{
-                    padding: '15px',
-                    textAlign: 'left',
-                    fontWeight: '600',
-                    color: '#333',
-                    width: '150px'
-                  }}>
-                    Status
-                  </th>
-                  <th style={{
-                    padding: '15px',
-                    textAlign: 'left',
-                    fontWeight: '600',
-                    color: '#333',
-                    width: '200px'
-                  }}>
-                    Created
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {companies.map((company) => (
-                  <tr
-                    key={company.id}
+        {/* Users Tab */}
+        {activeTab === 'users' && (
+          <div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '30px' }}>
+              {/* Create User Form */}
+              <div style={{
+                backgroundColor: 'white',
+                padding: '30px',
+                borderRadius: '8px',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+              }}>
+                <h2 style={{ marginTop: 0, color: '#144478' }}>Create New User</h2>
+                <form onSubmit={handleCreateUser}>
+                  <div style={{ marginBottom: '15px' }}>
+                    <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600' }}>
+                      Username *
+                    </label>
+                    <input
+                      type="text"
+                      value={newUser.username}
+                      onChange={(e) => setNewUser({...newUser, username: e.target.value})}
+                      required
+                      style={{
+                        width: '100%',
+                        padding: '10px',
+                        border: '1px solid #ddd',
+                        borderRadius: '4px',
+                        fontSize: '14px'
+                      }}
+                    />
+                  </div>
+                  <div style={{ marginBottom: '15px' }}>
+                    <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600' }}>
+                      Email *
+                    </label>
+                    <input
+                      type="email"
+                      value={newUser.email}
+                      onChange={(e) => setNewUser({...newUser, email: e.target.value})}
+                      required
+                      style={{
+                        width: '100%',
+                        padding: '10px',
+                        border: '1px solid #ddd',
+                        borderRadius: '4px',
+                        fontSize: '14px'
+                      }}
+                    />
+                  </div>
+                  <div style={{ marginBottom: '15px' }}>
+                    <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600' }}>
+                      Password *
+                    </label>
+                    <input
+                      type="password"
+                      value={newUser.password}
+                      onChange={(e) => setNewUser({...newUser, password: e.target.value})}
+                      required
+                      style={{
+                        width: '100%',
+                        padding: '10px',
+                        border: '1px solid #ddd',
+                        borderRadius: '4px',
+                        fontSize: '14px'
+                      }}
+                    />
+                  </div>
+                  <div style={{ marginBottom: '15px' }}>
+                    <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600' }}>
+                      Company *
+                    </label>
+                    <select
+                      value={newUser.companyId}
+                      onChange={(e) => setNewUser({...newUser, companyId: e.target.value})}
+                      required
+                      style={{
+                        width: '100%',
+                        padding: '10px',
+                        border: '1px solid #ddd',
+                        borderRadius: '4px',
+                        fontSize: '14px'
+                      }}
+                    >
+                      <option value="">Select a company</option>
+                      {companies.map((company) => (
+                        <option key={company.id} value={company.id}>
+                          {company.company_name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div style={{ marginBottom: '20px' }}>
+                    <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600' }}>
+                      Role *
+                    </label>
+                    <select
+                      value={newUser.role}
+                      onChange={(e) => setNewUser({...newUser, role: e.target.value})}
+                      style={{
+                        width: '100%',
+                        padding: '10px',
+                        border: '1px solid #ddd',
+                        borderRadius: '4px',
+                        fontSize: '14px'
+                      }}
+                    >
+                      <option value="user">User</option>
+                      <option value="admin">Admin</option>
+                    </select>
+                  </div>
+                  <button
+                    type="submit"
                     style={{
-                      borderBottom: '1px solid #dee2e6'
+                      padding: '12px 24px',
+                      backgroundColor: '#B3CC48',
+                      color: '#000',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      fontWeight: '600'
                     }}
                   >
-                    <td style={{
-                      padding: '15px',
-                      color: '#333',
-                      fontWeight: '500'
-                    }}>
-                      {company.company_name}
-                    </td>
-                    <td style={{
-                      padding: '15px'
-                    }}>
-                      <span style={{
-                        padding: '4px 12px',
-                        borderRadius: '12px',
-                        fontSize: '12px',
-                        fontWeight: '600',
-                        backgroundColor:
-                          company.account_status === 'active' ? '#d4edda' :
-                          company.account_status === 'past_due' ? '#fff3cd' :
-                          '#f8d7da',
-                        color:
-                          company.account_status === 'active' ? '#155724' :
-                          company.account_status === 'past_due' ? '#856404' :
-                          '#721c24'
-                      }}>
-                        {company.account_status}
-                      </span>
-                    </td>
-                    <td style={{
-                      padding: '15px',
-                      color: '#666',
-                      fontSize: '13px'
-                    }}>
-                      {new Date(company.created_at).toLocaleDateString()}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
+                    Create User
+                  </button>
+                </form>
+              </div>
+
+              {/* Users List */}
+              <div style={{
+                backgroundColor: 'white',
+                padding: '30px',
+                borderRadius: '8px',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+              }}>
+                <h2 style={{ marginTop: 0, color: '#144478' }}>Existing Users</h2>
+                <div style={{ maxHeight: '500px', overflowY: 'auto' }}>
+                  {users.map((user) => (
+                    <div
+                      key={user.id}
+                      style={{
+                        padding: '15px',
+                        borderBottom: '1px solid #eee'
+                      }}
+                    >
+                      <div style={{ fontWeight: '600', marginBottom: '5px' }}>
+                        {user.username} ({user.role})
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#666' }}>
+                        {user.email} | {user.company_name}
+                      </div>
+                      <div style={{ fontSize: '11px', color: '#999', marginTop: '3px' }}>
+                        Status: {user.is_activated ? 'Active' : 'Inactive'}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Folders Tab */}
+        {activeTab === 'folders' && (
+          <div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '30px' }}>
+              {/* Create Folder Form */}
+              <div style={{
+                backgroundColor: 'white',
+                padding: '30px',
+                borderRadius: '8px',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+              }}>
+                <h2 style={{ marginTop: 0, color: '#144478' }}>Create New Folder</h2>
+                <form onSubmit={handleCreateFolder}>
+                  <div style={{ marginBottom: '15px' }}>
+                    <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600' }}>
+                      Folder Name *
+                    </label>
+                    <input
+                      type="text"
+                      value={newFolder.folderName}
+                      onChange={(e) => setNewFolder({...newFolder, folderName: e.target.value})}
+                      required
+                      style={{
+                        width: '100%',
+                        padding: '10px',
+                        border: '1px solid #ddd',
+                        borderRadius: '4px',
+                        fontSize: '14px'
+                      }}
+                    />
+                  </div>
+                  <div style={{ marginBottom: '15px' }}>
+                    <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600' }}>
+                      Folder Type *
+                    </label>
+                    <select
+                      value={newFolder.folderType}
+                      onChange={(e) => setNewFolder({...newFolder, folderType: e.target.value})}
+                      style={{
+                        width: '100%',
+                        padding: '10px',
+                        border: '1px solid #ddd',
+                        borderRadius: '4px',
+                        fontSize: '14px'
+                      }}
+                    >
+                      <option value="program_files">Program Files (All users)</option>
+                      <option value="shared">Shared (All users)</option>
+                      <option value="company_specific">Company Specific</option>
+                    </select>
+                  </div>
+                  {newFolder.folderType === 'company_specific' && (
+                    <div style={{ marginBottom: '20px' }}>
+                      <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600' }}>
+                        Company *
+                      </label>
+                      <select
+                        value={newFolder.companyId}
+                        onChange={(e) => setNewFolder({...newFolder, companyId: e.target.value})}
+                        required
+                        style={{
+                          width: '100%',
+                          padding: '10px',
+                          border: '1px solid #ddd',
+                          borderRadius: '4px',
+                          fontSize: '14px'
+                        }}
+                      >
+                        <option value="">Select a company</option>
+                        {companies.map((company) => (
+                          <option key={company.id} value={company.id}>
+                            {company.company_name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                  <button
+                    type="submit"
+                    style={{
+                      padding: '12px 24px',
+                      backgroundColor: '#B3CC48',
+                      color: '#000',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      fontWeight: '600'
+                    }}
+                  >
+                    Create Folder
+                  </button>
+                </form>
+              </div>
+
+              {/* Folders List */}
+              <div style={{
+                backgroundColor: 'white',
+                padding: '30px',
+                borderRadius: '8px',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+              }}>
+                <h2 style={{ marginTop: 0, color: '#144478' }}>Existing Folders</h2>
+                <div style={{ maxHeight: '500px', overflowY: 'auto' }}>
+                  {folders.map((folder) => (
+                    <div
+                      key={folder.id}
+                      style={{
+                        padding: '15px',
+                        borderBottom: '1px solid #eee'
+                      }}
+                    >
+                      <div style={{ fontWeight: '600', marginBottom: '5px' }}>
+                        📁 {folder.folder_name}
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#666' }}>
+                        Type: {folder.folder_type.replace('_', ' ')}
+                        {folder.company_name && ` | Company: ${folder.company_name}`}
+                      </div>
+                      <div style={{ fontSize: '11px', color: '#999', marginTop: '3px' }}>
+                        Path: {folder.blob_prefix}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );
