@@ -122,6 +122,33 @@ const blobPrefix = folder.blobPrefix;
     }
   };
 
+const handleDelete = async (fileUrl: string, filename: string) => {
+  // Confirmation dialog
+  if (!confirm(`Are you sure you want to delete "${filename}"?\n\nThis action cannot be undone.`)) {
+    return;
+  }
+
+  try {
+    const response = await fetch('/api/files/delete', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: fileUrl }),
+    });
+
+    const data = await response.json();
+
+    if (response.ok && data.success) {
+      alert('File deleted successfully!');
+      await loadFiles(); // Reload file list
+    } else {
+      alert(data.error || 'Failed to delete file');
+    }
+  } catch (error) {
+    console.error('Delete error:', error);
+    alert('Failed to delete file. Please try again.');
+  }
+};
+
   const formatFileSize = (bytes: number) => {
     if (bytes < 1024) return bytes + ' B';
     if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
@@ -320,7 +347,7 @@ const blobPrefix = folder.blobPrefix;
                     textAlign: 'center',
                     fontWeight: '600',
                     color: '#333',
-                    width: '120px'
+                    width: '200px'
                   }}>
                     Action
                   </th>
@@ -353,26 +380,45 @@ const blobPrefix = folder.blobPrefix;
                     }}>
                       {formatDate(file.uploadedAt)}
                     </td>
-                    <td style={{
-                      padding: '15px',
-                      textAlign: 'center'
-                    }}>
-                      <button
-                        onClick={() => handleDownload(file.url, file.filename)}
-                        disabled={session.user.accountStatus !== 'active'}
-                        style={{
-                          padding: '6px 16px',
-                          backgroundColor: session.user.accountStatus === 'active' ? '#144478' : '#ccc',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '4px',
-                          cursor: session.user.accountStatus === 'active' ? 'pointer' : 'not-allowed',
-                          fontSize: '13px'
-                        }}
-                      >
-                        Download
-                      </button>
-                    </td>
+                   <td style={{
+  padding: '15px',
+  textAlign: 'center'
+}}>
+  <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+    <button
+      onClick={() => handleDownload(file.url, file.filename)}
+      disabled={session.user.accountStatus !== 'active'}
+      style={{
+        padding: '6px 16px',
+        backgroundColor: session.user.accountStatus === 'active' ? '#144478' : '#ccc',
+        color: 'white',
+        border: 'none',
+        borderRadius: '4px',
+        cursor: session.user.accountStatus === 'active' ? 'pointer' : 'not-allowed',
+        fontSize: '13px'
+      }}
+    >
+      Download
+    </button>
+    
+    {session.user.role === 'admin' && (
+      <button
+        onClick={() => handleDelete(file.url, file.filename)}
+        style={{
+          padding: '6px 16px',
+          backgroundColor: '#dc3545',
+          color: 'white',
+          border: 'none',
+          borderRadius: '4px',
+          cursor: 'pointer',
+          fontSize: '13px'
+        }}
+      >
+        Delete
+      </button>
+    )}
+  </div>
+</td>
                   </tr>
                 ))}
               </tbody>
