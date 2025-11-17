@@ -18,6 +18,7 @@ interface Folder {
   name: string;
   type: string;
   companyName?: string;
+  blobPrefix: string;
 }
 
 export default function FilesPage() {
@@ -74,12 +75,8 @@ try {
     return;
   }
 
-  // Get folder prefix from the folder object
-  const blobPrefix = folder.type === 'program_files' 
-    ? 'program-files/' 
-    : folder.type === 'shared'
-    ? 'shared/'
-    : `company-${session.user.companyId}/`;
+// Use the actual blob prefix from the folder
+const blobPrefix = folder.blobPrefix;
     
     // Upload directly to Vercel Blob with correct prefix
     const blob = await upload(`${blobPrefix}${file.name}`, file, {

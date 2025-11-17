@@ -60,15 +60,16 @@ export async function GET(req: NextRequest) {
     }));
 
     return NextResponse.json({
-      success: true,
-      folder: {
-        id: folder.id,
-        name: folder.folder_name,
-        type: folder.folder_type,
-        companyName: folder.company_name
-      },
-      files
-    });
+  success: true,
+  folder: {
+    id: folder.id,
+    name: folder.folder_name,
+    type: folder.folder_type,
+    companyName: folder.company_name,
+    blobPrefix: folder.blob_prefix
+  },
+  files
+});
 
   } catch (error) {
     console.error('List files error:', error);
