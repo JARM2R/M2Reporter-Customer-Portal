@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
     // Store new token
     await sql`
       INSERT INTO password_reset_tokens (user_id, token, expires_at)
-      VALUES (${user.id}, ${token}, ${expiresAt})
+      VALUES (${user.id}, ${token}, ${expiresAt.toISOString()})
     `;
 
     // Send reset email
