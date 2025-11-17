@@ -68,13 +68,18 @@ export default function FilesPage() {
   setUploading(true);
   setUploadError('');
 
-  try {
-    // Get folder prefix from the folder object
-    const blobPrefix = folder.type === 'program_files' 
-      ? 'program-files/' 
-      : folder.type === 'shared'
-      ? 'shared/'
-      : `company-${session.user.companyId}/`;
+try {
+  if (!folder) {
+    setUploadError('Folder not found');
+    return;
+  }
+
+  // Get folder prefix from the folder object
+  const blobPrefix = folder.type === 'program_files' 
+    ? 'program-files/' 
+    : folder.type === 'shared'
+    ? 'shared/'
+    : `company-${session.user.companyId}/`;
     
     // Upload directly to Vercel Blob with correct prefix
     const blob = await upload(`${blobPrefix}${file.name}`, file, {
