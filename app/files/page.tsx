@@ -69,8 +69,8 @@ export default function FilesPage() {
   setUploadError('');
 
 try {
-  if (!folder) {
-    setUploadError('Folder not found');
+  if (!folder || !session) {
+    setUploadError('Session or folder not found');
     return;
   }
 
