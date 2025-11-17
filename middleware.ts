@@ -30,5 +30,12 @@ export default withAuth(
 );
 
 export const config = {
-  matcher: ['/admin/:path*', '/dashboard/:path*', '/files/:path*'],
+  // Protect page routes but EXCLUDE API routes
+  matcher: [
+    '/admin',
+    '/dashboard/:path*',
+    '/files/:path*',
+    // Exclude API routes, static files, and images
+    '/((?!api|_next/static|_next/image|favicon.ico).*)',
+  ],
 };
