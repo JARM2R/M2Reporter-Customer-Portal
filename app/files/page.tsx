@@ -70,10 +70,13 @@ export default function FilesPage() {
 
   try {
     // Upload directly to Vercel Blob (bypasses 4.5MB API limit)
-    const blob = await upload(file.name, file, {
-      access: 'public',
-      handleUploadUrl: '/api/files/upload',
-    });
+  const blob = await upload(file.name, file, {
+  access: 'public',
+  handleUploadUrl: '/api/files/upload',
+  options: {
+    addRandomSuffix: true,
+  },
+});
 
     // Save file metadata to database
     const metadataResponse = await fetch('/api/files/save-metadata', {
