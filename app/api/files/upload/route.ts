@@ -31,7 +31,7 @@ onBeforeGenerateToken: async (pathname, clientPayload) => {
   return {
     allowedContentTypes: allowedTypes,
     maximumSizeInBytes: 100 * 1024 * 1024, // 100MB
-    addRandomSuffix: true, // Add this line
+    allowOverwrite: true, // Changed from addRandomSuffix
   };
 },
 
