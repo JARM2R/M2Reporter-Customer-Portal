@@ -50,7 +50,7 @@ export default function AdminPage() {
     email: '',
     password: '',
     companyId: '',
-    role: 'user'
+    role: 'customer'
   });
   const [newFolder, setNewFolder] = useState({
     folderName: '',
@@ -468,7 +468,7 @@ if (status === 'loading' || loading || !session || session.user.role !== 'admin'
                         fontSize: '14px'
                       }}
                     >
-                      <option value="user">User</option>
+                      <option value="customer">Customer</option>
                       <option value="admin">Admin</option>
                     </select>
                   </div>
@@ -485,7 +485,7 @@ if (status === 'loading' || loading || !session || session.user.role !== 'admin'
                       fontWeight: '600'
                     }}
                   >
-                    Create User
+                    Create Customer
                   </button>
                 </form>
               </div>
