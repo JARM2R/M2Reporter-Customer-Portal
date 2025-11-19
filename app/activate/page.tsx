@@ -263,8 +263,8 @@ export default function ActivatePage() {
           color: '#666'
         }}>
           Need help? Contact{' '}
-          <a href="mailto:support@m2reporter.com" style={{ color: '#144478' }}>
-            support@m2reporter.com
+          <a href="mailto:help@m2reporter.com" style={{ color: '#144478' }}>
+            help@m2reporter.com
           </a>
         </div>
       </div>
