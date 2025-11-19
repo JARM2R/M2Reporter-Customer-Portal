@@ -50,8 +50,18 @@ export async function GET(req: NextRequest) {
       limit: 1000
     });
 
+    // Filter to only include files directly in this folder (not in subfolders)
+    const filesInThisFolder = blobs.filter(blob => {
+      // Remove the folder prefix from the blob pathname
+      const relativePath = blob.pathname.replace(folder.blob_prefix, '');
+      
+      // If there are any "/" characters in the relative path, it's in a subfolder
+      // We only want files directly in this folder
+      return relativePath && !relativePath.includes('/');
+    });
+
     // Format file list
-    const files = blobs.map(blob => ({
+    const files = filesInThisFolder.map(blob => ({
       url: blob.url,
       pathname: blob.pathname,
       size: blob.size,
@@ -60,16 +70,16 @@ export async function GET(req: NextRequest) {
     }));
 
     return NextResponse.json({
-  success: true,
-  folder: {
-    id: folder.id,
-    name: folder.folder_name,
-    type: folder.folder_type,
-    companyName: folder.company_name,
-    blobPrefix: folder.blob_prefix
-  },
-  files
-});
+      success: true,
+      folder: {
+        id: folder.id,
+        name: folder.folder_name,
+        type: folder.folder_type,
+        companyName: folder.company_name,
+        blobPrefix: folder.blob_prefix
+      },
+      files
+    });
 
   } catch (error) {
     console.error('List files error:', error);
