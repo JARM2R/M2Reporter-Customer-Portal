@@ -23,7 +23,7 @@ export async function DELETE(request: NextRequest): Promise<NextResponse> {
 
     // Extract blob path from URL to determine which folder it belongs to
     const urlParts = url.split('/');
-    const domainIndex = urlParts.findIndex(part => part.includes('blob.vercel-storage.com'));
+    const domainIndex = urlParts.findIndex((part: string) => part.includes('blob.vercel-storage.com'));
     const blobPath = domainIndex !== -1 ? urlParts.slice(domainIndex + 1).join('/') : url.split('/').pop() || '';
 
     // Get folder information for this file
