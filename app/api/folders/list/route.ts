@@ -18,7 +18,8 @@ export async function GET(req: NextRequest) {
         id,
         folder_name,
         folder_type,
-        blob_prefix
+        blob_prefix,
+        parent_folder_id
       FROM file_permissions
       WHERE
         folder_type IN ('shared', 'program_files')
@@ -29,6 +30,7 @@ export async function GET(req: NextRequest) {
           WHEN 'shared' THEN 2
           WHEN 'company_specific' THEN 3
         END,
+        parent_folder_id NULLS FIRST,
         folder_name
     `;
 

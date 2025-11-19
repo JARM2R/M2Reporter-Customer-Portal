@@ -8,6 +8,7 @@ interface Folder {
   id: number;
   folder_name: string;
   folder_type: string;
+  parent_folder_id: number | null;
 }
 
 export default function DashboardPage() {
@@ -29,7 +30,9 @@ export default function DashboardPage() {
       const response = await fetch('/api/folders/list');
       const data = await response.json();
       if (data.success) {
-        setFolders(data.folders);
+        // Only show parent folders (no parent_folder_id) on dashboard
+        const parentFolders = data.folders.filter((folder: Folder) => !folder.parent_folder_id);
+        setFolders(parentFolders);
       }
     } catch (error) {
       console.error('Failed to load folders:', error);

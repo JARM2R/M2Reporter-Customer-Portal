@@ -21,6 +21,13 @@ interface Folder {
   blobPrefix: string;
 }
 
+interface SubFolder {
+  id: number;
+  folder_name: string;
+  folder_type: string;
+  parent_folder_id: number;
+}
+
 export default function FilesPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -29,6 +36,7 @@ export default function FilesPage() {
 
   const [folder, setFolder] = useState<Folder | null>(null);
   const [files, setFiles] = useState<FileItem[]>([]);
+  const [subfolders, setSubfolders] = useState<SubFolder[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
@@ -37,9 +45,13 @@ export default function FilesPage() {
     if (status === 'unauthenticated') {
       router.push('/login');
     } else if (status === 'authenticated' && folderId) {
-      loadFiles();
+      loadFolderData();
     }
   }, [status, folderId, router]);
+
+  const loadFolderData = async () => {
+    await Promise.all([loadFiles(), loadSubfolders()]);
+  };
 
   const loadFiles = async () => {
     try {
@@ -62,40 +74,56 @@ export default function FilesPage() {
     }
   };
 
- const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-  const file = e.target.files?.[0];
-  if (!file) return;
+  const loadSubfolders = async () => {
+    try {
+      const response = await fetch('/api/folders/list');
+      const data = await response.json();
+      if (data.success) {
+        // Filter to only show subfolders of current folder
+        const currentFolderSubfolders = data.folders.filter(
+          (f: SubFolder) => f.parent_folder_id === parseInt(folderId || '0')
+        );
+        setSubfolders(currentFolderSubfolders);
+      }
+    } catch (error) {
+      console.error('Failed to load subfolders:', error);
+    }
+  };
 
-  setUploading(true);
-  setUploadError('');
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-try {
-  if (!folder || !session) {
-    setUploadError('Session or folder not found');
-    return;
-  }
+    setUploading(true);
+    setUploadError('');
 
-// Use the actual blob prefix from the folder
-const blobPrefix = folder.blobPrefix;
-    
-    // Upload directly to Vercel Blob with correct prefix
-    const blob = await upload(`${blobPrefix}${file.name}`, file, {
-      access: 'public',
-      handleUploadUrl: '/api/files/upload',
-    });
+    try {
+      if (!folder || !session) {
+        setUploadError('Session or folder not found');
+        return;
+      }
 
-    // Reload file list
-    await loadFiles();
-    alert('File uploaded successfully!');
-  } catch (error) {
-    console.error('Upload error:', error);
-    setUploadError('Upload failed. Please try again.');
-  } finally {
-    setUploading(false);
-    // Reset file input
-    e.target.value = '';
-  }
-};
+      // Use the actual blob prefix from the folder
+      const blobPrefix = folder.blobPrefix;
+      
+      // Upload directly to Vercel Blob with correct prefix
+      const blob = await upload(`${blobPrefix}${file.name}`, file, {
+        access: 'public',
+        handleUploadUrl: '/api/files/upload',
+      });
+
+      // Reload file list
+      await loadFiles();
+      alert('File uploaded successfully!');
+    } catch (error) {
+      console.error('Upload error:', error);
+      setUploadError('Upload failed. Please try again.');
+    } finally {
+      setUploading(false);
+      // Reset file input
+      e.target.value = '';
+    }
+  };
 
   const handleDownload = async (fileUrl: string, filename: string) => {
     try {
@@ -122,32 +150,32 @@ const blobPrefix = folder.blobPrefix;
     }
   };
 
-const handleDelete = async (fileUrl: string, filename: string) => {
-  // Confirmation dialog
-  if (!confirm(`Are you sure you want to delete "${filename}"?\n\nThis action cannot be undone.`)) {
-    return;
-  }
-
-  try {
-    const response = await fetch('/api/files/delete', {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url: fileUrl }),
-    });
-
-    const data = await response.json();
-
-    if (response.ok && data.success) {
-      alert('File deleted successfully!');
-      await loadFiles(); // Reload file list
-    } else {
-      alert(data.error || 'Failed to delete file');
+  const handleDelete = async (fileUrl: string, filename: string) => {
+    // Confirmation dialog
+    if (!confirm(`Are you sure you want to delete "${filename}"?\n\nThis action cannot be undone.`)) {
+      return;
     }
-  } catch (error) {
-    console.error('Delete error:', error);
-    alert('Failed to delete file. Please try again.');
-  }
-};
+
+    try {
+      const response = await fetch('/api/files/delete', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: fileUrl }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        alert('File deleted successfully!');
+        await loadFiles(); // Reload file list
+      } else {
+        alert(data.error || 'Failed to delete file');
+      }
+    } catch (error) {
+      console.error('Delete error:', error);
+      alert('Failed to delete file. Please try again.');
+    }
+  };
 
   const formatFileSize = (bytes: number) => {
     if (bytes < 1024) return bytes + ' B';
@@ -176,6 +204,7 @@ const handleDelete = async (fileUrl: string, filename: string) => {
   if (!session || !folder) {
     return null;
   }
+
   const canUpload = session.user.accountStatus === 'active' &&
     (session.user.role === 'admin' || folder.type !== 'program_files');
 
@@ -242,6 +271,7 @@ const handleDelete = async (fileUrl: string, filename: string) => {
             </h2>
             <p style={{ color: '#666', margin: 0 }}>
               {files.length} {files.length === 1 ? 'file' : 'files'}
+              {subfolders.length > 0 && ` • ${subfolders.length} ${subfolders.length === 1 ? 'subfolder' : 'subfolders'}`}
             </p>
           </div>
 
@@ -286,144 +316,209 @@ const handleDelete = async (fileUrl: string, filename: string) => {
           </div>
         )}
 
-        {/* Files Table */}
-        <div style={{
-          backgroundColor: 'white',
-          borderRadius: '8px',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-          overflow: 'hidden'
-        }}>
-          {files.length === 0 ? (
+        {/* Subfolders Section */}
+        {subfolders.length > 0 && (
+          <div style={{ marginBottom: '30px' }}>
+            <h3 style={{
+              fontSize: '18px',
+              color: '#144478',
+              marginBottom: '15px'
+            }}>
+              📁 Subfolders
+            </h3>
             <div style={{
-              padding: '40px',
-              textAlign: 'center',
-              color: '#666'
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
+              gap: '15px'
             }}>
-              <p>No files in this folder yet.</p>
-              {canUpload && (
-                <p style={{ fontSize: '14px' }}>
-                  Click "Upload File" to add files.
-                </p>
-              )}
+              {subfolders.map((subfolder) => (
+                <div
+                  key={subfolder.id}
+                  onClick={() => router.push(`/files?folderId=${subfolder.id}`)}
+                  style={{
+                    backgroundColor: 'white',
+                    padding: '20px',
+                    borderRadius: '8px',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                    cursor: 'pointer',
+                    transition: 'transform 0.2s, box-shadow 0.2s',
+                    border: '2px solid transparent',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+                    e.currentTarget.style.borderColor = '#B3CC48';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
+                    e.currentTarget.style.borderColor = 'transparent';
+                  }}
+                >
+                  <span style={{ fontSize: '24px' }}>📁</span>
+                  <span style={{
+                    fontSize: '15px',
+                    fontWeight: '600',
+                    color: '#144478'
+                  }}>
+                    {subfolder.folder_name}
+                  </span>
+                </div>
+              ))}
             </div>
-          ) : (
-            <table style={{
-              width: '100%',
-              borderCollapse: 'collapse'
-            }}>
-              <thead>
-                <tr style={{
-                  backgroundColor: '#f8f9fa',
-                  borderBottom: '2px solid #dee2e6'
-                }}>
-                  <th style={{
-                    padding: '15px',
-                    textAlign: 'left',
-                    fontWeight: '600',
-                    color: '#333'
+          </div>
+        )}
+
+        {/* Files Table */}
+        <div>
+          <h3 style={{
+            fontSize: '18px',
+            color: '#144478',
+            marginBottom: '15px'
+          }}>
+            📄 Files
+          </h3>
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '8px',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+            overflow: 'hidden'
+          }}>
+            {files.length === 0 ? (
+              <div style={{
+                padding: '40px',
+                textAlign: 'center',
+                color: '#666'
+              }}>
+                <p>No files in this folder yet.</p>
+                {canUpload && (
+                  <p style={{ fontSize: '14px' }}>
+                    Click "Upload File" to add files.
+                  </p>
+                )}
+              </div>
+            ) : (
+              <table style={{
+                width: '100%',
+                borderCollapse: 'collapse'
+              }}>
+                <thead>
+                  <tr style={{
+                    backgroundColor: '#f8f9fa',
+                    borderBottom: '2px solid #dee2e6'
                   }}>
-                    Filename
-                  </th>
-                  <th style={{
-                    padding: '15px',
-                    textAlign: 'left',
-                    fontWeight: '600',
-                    color: '#333',
-                    width: '120px'
-                  }}>
-                    Size
-                  </th>
-                  <th style={{
-                    padding: '15px',
-                    textAlign: 'left',
-                    fontWeight: '600',
-                    color: '#333',
-                    width: '200px'
-                  }}>
-                    Uploaded
-                  </th>
-                  <th style={{
-                    padding: '15px',
-                    textAlign: 'center',
-                    fontWeight: '600',
-                    color: '#333',
-                    width: '200px'
-                  }}>
-                    Action
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {files.map((file, index) => (
-                  <tr
-                    key={file.url}
-                    style={{
-                      borderBottom: '1px solid #dee2e6'
-                    }}
-                  >
-                    <td style={{
+                    <th style={{
                       padding: '15px',
+                      textAlign: 'left',
+                      fontWeight: '600',
                       color: '#333'
                     }}>
-                      📄 {file.filename}
-                    </td>
-                    <td style={{
+                      Filename
+                    </th>
+                    <th style={{
                       padding: '15px',
-                      color: '#666'
+                      textAlign: 'left',
+                      fontWeight: '600',
+                      color: '#333',
+                      width: '120px'
                     }}>
-                      {formatFileSize(file.size)}
-                    </td>
-                    <td style={{
+                      Size
+                    </th>
+                    <th style={{
                       padding: '15px',
-                      color: '#666',
-                      fontSize: '13px'
+                      textAlign: 'left',
+                      fontWeight: '600',
+                      color: '#333',
+                      width: '200px'
                     }}>
-                      {formatDate(file.uploadedAt)}
-                    </td>
-                   <td style={{
-  padding: '15px',
-  textAlign: 'center'
-}}>
-  <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-    <button
-      onClick={() => handleDownload(file.url, file.filename)}
-      disabled={session.user.accountStatus !== 'active'}
-      style={{
-        padding: '6px 16px',
-        backgroundColor: session.user.accountStatus === 'active' ? '#144478' : '#ccc',
-        color: 'white',
-        border: 'none',
-        borderRadius: '4px',
-        cursor: session.user.accountStatus === 'active' ? 'pointer' : 'not-allowed',
-        fontSize: '13px'
-      }}
-    >
-      Download
-    </button>
-    
-    {session.user.role === 'admin' && (
-      <button
-        onClick={() => handleDelete(file.url, file.filename)}
-        style={{
-          padding: '6px 16px',
-          backgroundColor: '#dc3545',
-          color: 'white',
-          border: 'none',
-          borderRadius: '4px',
-          cursor: 'pointer',
-          fontSize: '13px'
-        }}
-      >
-        Delete
-      </button>
-    )}
-  </div>
-</td>
+                      Uploaded
+                    </th>
+                    <th style={{
+                      padding: '15px',
+                      textAlign: 'center',
+                      fontWeight: '600',
+                      color: '#333',
+                      width: '200px'
+                    }}>
+                      Action
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+                </thead>
+                <tbody>
+                  {files.map((file, index) => (
+                    <tr
+                      key={file.url}
+                      style={{
+                        borderBottom: '1px solid #dee2e6'
+                      }}
+                    >
+                      <td style={{
+                        padding: '15px',
+                        color: '#333'
+                      }}>
+                        📄 {file.filename}
+                      </td>
+                      <td style={{
+                        padding: '15px',
+                        color: '#666'
+                      }}>
+                        {formatFileSize(file.size)}
+                      </td>
+                      <td style={{
+                        padding: '15px',
+                        color: '#666',
+                        fontSize: '13px'
+                      }}>
+                        {formatDate(file.uploadedAt)}
+                      </td>
+                      <td style={{
+                        padding: '15px',
+                        textAlign: 'center'
+                      }}>
+                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                          <button
+                            onClick={() => handleDownload(file.url, file.filename)}
+                            disabled={session.user.accountStatus !== 'active'}
+                            style={{
+                              padding: '6px 16px',
+                              backgroundColor: session.user.accountStatus === 'active' ? '#144478' : '#ccc',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '4px',
+                              cursor: session.user.accountStatus === 'active' ? 'pointer' : 'not-allowed',
+                              fontSize: '13px'
+                            }}
+                          >
+                            Download
+                          </button>
+                          
+                          {session.user.role === 'admin' && (
+                            <button
+                              onClick={() => handleDelete(file.url, file.filename)}
+                              style={{
+                                padding: '6px 16px',
+                                backgroundColor: '#dc3545',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                fontSize: '13px'
+                              }}
+                            >
+                              Delete
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
         </div>
       </main>
     </div>
