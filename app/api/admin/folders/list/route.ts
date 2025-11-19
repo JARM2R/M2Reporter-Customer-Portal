@@ -18,15 +18,19 @@ export async function GET(req: NextRequest) {
         fp.folder_type,
         fp.blob_prefix,
         fp.company_id,
-        c.company_name
+        fp.parent_folder_id,
+        c.company_name,
+        parent.folder_name as parent_folder_name
       FROM file_permissions fp
       LEFT JOIN companies c ON fp.company_id = c.id
+      LEFT JOIN file_permissions parent ON fp.parent_folder_id = parent.id
       ORDER BY 
         CASE fp.folder_type
           WHEN 'program_files' THEN 1
           WHEN 'shared' THEN 2
           WHEN 'company_specific' THEN 3
         END,
+        fp.parent_folder_id NULLS FIRST,
         fp.folder_name
     `;
 

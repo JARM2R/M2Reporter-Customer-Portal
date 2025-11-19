@@ -32,6 +32,8 @@ interface Folder {
   blob_prefix: string;
   company_id: number;
   company_name: string;
+  parent_folder_id: number | null;
+  parent_folder_name: string | null;
 }
 
 interface FileItem {
@@ -51,6 +53,7 @@ export default function AdminPage() {
   const [folders, setFolders] = useState<Folder[]>([]);
   const [files, setFiles] = useState<FileItem[]>([]);
   const [selectedFolder, setSelectedFolder] = useState<Folder | null>(null);
+  const [expandedFolders, setExpandedFolders] = useState<Set<number>>(new Set());
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
 
@@ -66,8 +69,11 @@ export default function AdminPage() {
   const [newFolder, setNewFolder] = useState({
     folderName: '',
     folderType: 'company_specific',
-    companyId: ''
+    companyId: '',
+    parentFolderId: null as number | null
   });
+  const [showSubfolderForm, setShowSubfolderForm] = useState(false);
+  const [subfolderParent, setSubfolderParent] = useState<Folder | null>(null);
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -124,6 +130,45 @@ export default function AdminPage() {
     if (data.success) {
       setFiles(data.files);
     }
+  };
+
+  // Get root folders (no parent)
+  const getRootFolders = () => {
+    return folders.filter(f => !f.parent_folder_id);
+  };
+
+  // Get subfolders of a parent
+  const getSubfolders = (parentId: number) => {
+    return folders.filter(f => f.parent_folder_id === parentId);
+  };
+
+  // Toggle folder expansion
+  const toggleFolder = (folderId: number) => {
+    const newExpanded = new Set(expandedFolders);
+    if (newExpanded.has(folderId)) {
+      newExpanded.delete(folderId);
+    } else {
+      newExpanded.add(folderId);
+    }
+    setExpandedFolders(newExpanded);
+  };
+
+  // Get folder path for breadcrumb
+  const getFolderPath = (folder: Folder): Folder[] => {
+    const path: Folder[] = [folder];
+    let current = folder;
+    
+    while (current.parent_folder_id) {
+      const parent = folders.find(f => f.id === current.parent_folder_id);
+      if (parent) {
+        path.unshift(parent);
+        current = parent;
+      } else {
+        break;
+      }
+    }
+    
+    return path;
   };
 
   const handleCreateCompany = async (e: React.FormEvent) => {
@@ -224,7 +269,8 @@ export default function AdminPage() {
       body: JSON.stringify({
         folderName: newFolder.folderName,
         folderType: newFolder.folderType,
-        companyId: newFolder.companyId ? parseInt(newFolder.companyId) : null
+        companyId: newFolder.companyId ? parseInt(newFolder.companyId) : null,
+        parentFolderId: newFolder.parentFolderId
       })
     });
 
@@ -232,15 +278,34 @@ export default function AdminPage() {
     
     if (data.success) {
       alert('Folder created successfully!');
-      setNewFolder({ folderName: '', folderType: 'company_specific', companyId: '' });
+      setNewFolder({ folderName: '', folderType: 'company_specific', companyId: '', parentFolderId: null });
+      setShowSubfolderForm(false);
+      setSubfolderParent(null);
       loadFolders();
     } else {
       alert(data.error || 'Failed to create folder');
     }
   };
 
+  const handleCreateSubfolder = (parentFolder: Folder) => {
+    setSubfolderParent(parentFolder);
+    setNewFolder({
+      folderName: '',
+      folderType: parentFolder.folder_type,
+      companyId: parentFolder.company_id?.toString() || '',
+      parentFolderId: parentFolder.id
+    });
+    setShowSubfolderForm(true);
+  };
+
+  const cancelSubfolderForm = () => {
+    setShowSubfolderForm(false);
+    setSubfolderParent(null);
+    setNewFolder({ folderName: '', folderType: 'company_specific', companyId: '', parentFolderId: null });
+  };
+
   const handleDeleteFolder = async (folderId: number, folderName: string) => {
-    if (!confirm(`Are you sure you want to delete folder "${folderName}"?\n\nThis will permanently delete all files in this folder. This action cannot be undone.`)) {
+    if (!confirm(`Are you sure you want to delete folder "${folderName}"?\n\nThis will permanently delete all files and subfolders. This action cannot be undone.`)) {
       return;
     }
 
@@ -341,6 +406,104 @@ export default function AdminPage() {
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+  };
+
+  // Render folder tree recursively
+  const renderFolderTree = (parentId: number | null = null, depth: number = 0): JSX.Element[] => {
+    const foldersAtLevel = parentId === null ? getRootFolders() : getSubfolders(parentId);
+    
+    return foldersAtLevel.map((folder) => {
+      const hasSubfolders = getSubfolders(folder.id).length > 0;
+      const isExpanded = expandedFolders.has(folder.id);
+      
+      return (
+        <div key={folder.id}>
+          <div
+            style={{
+              padding: '12px 15px',
+              paddingLeft: `${15 + (depth * 30)}px`,
+              borderBottom: '1px solid #eee',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              backgroundColor: depth % 2 === 0 ? 'white' : '#f8f9fa'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
+              {hasSubfolders ? (
+                <button
+                  onClick={() => toggleFolder(folder.id)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    padding: '4px',
+                    width: '20px',
+                    color: '#144478'
+                  }}
+                >
+                  {isExpanded ? '▼' : '▶'}
+                </button>
+              ) : (
+                <span style={{ width: '20px' }}></span>
+              )}
+              
+              <span style={{ fontSize: '18px' }}>📁</span>
+              
+              <div>
+                <div style={{ fontWeight: '600', marginBottom: '2px', fontSize: '14px' }}>
+                  {folder.folder_name}
+                </div>
+                <div style={{ fontSize: '11px', color: '#666' }}>
+                  {folder.folder_type.replace('_', ' ')}
+                  {folder.company_name && ` | ${folder.company_name}`}
+                  {depth > 0 && ` | Path: ${folder.blob_prefix}`}
+                </div>
+              </div>
+            </div>
+            
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                onClick={() => handleCreateSubfolder(folder)}
+                style={{
+                  padding: '6px 12px',
+                  backgroundColor: '#B3CC48',
+                  color: '#000',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                  fontWeight: '600'
+                }}
+              >
+                + Subfolder
+              </button>
+              <button
+                onClick={() => handleDeleteFolder(folder.id, folder.folder_name)}
+                style={{
+                  padding: '6px 12px',
+                  backgroundColor: '#dc3545',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontSize: '12px'
+                }}
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+          
+          {isExpanded && hasSubfolders && (
+            <div>
+              {renderFolderTree(folder.id, depth + 1)}
+            </div>
+          )}
+        </div>
+      );
+    });
   };
 
   if (status === 'loading' || loading || !session || session.user.role !== 'admin') {
@@ -646,7 +809,7 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* Folders Tab */}
+        {/* Folders Tab with Tree View */}
         {activeTab === 'folders' && (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '30px' }}>
             <div style={{
@@ -655,10 +818,35 @@ export default function AdminPage() {
               borderRadius: '8px',
               boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
             }}>
-              <h2 style={{ marginTop: 0, color: '#144478' }}>Create New Folder</h2>
+              <h2 style={{ marginTop: 0, color: '#144478' }}>
+                {showSubfolderForm ? `Create Subfolder in "${subfolderParent?.folder_name}"` : 'Create New Root Folder'}
+              </h2>
+              
+              {showSubfolderForm && (
+                <div style={{
+                  backgroundColor: '#f8f9fa',
+                  padding: '12px',
+                  borderRadius: '4px',
+                  marginBottom: '15px',
+                  fontSize: '13px'
+                }}>
+                  <strong>Parent:</strong> {subfolderParent?.folder_name}
+                  <br />
+                  <strong>Type:</strong> {subfolderParent?.folder_type.replace('_', ' ')}
+                  {subfolderParent?.company_name && (
+                    <>
+                      <br />
+                      <strong>Company:</strong> {subfolderParent.company_name}
+                    </>
+                  )}
+                </div>
+              )}
+
               <form onSubmit={handleCreateFolder}>
                 <div style={{ marginBottom: '15px' }}>
-                  <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600' }}>Folder Name *</label>
+                  <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600' }}>
+                    Folder Name *
+                  </label>
                   <input
                     type="text"
                     value={newFolder.folderName}
@@ -667,49 +855,76 @@ export default function AdminPage() {
                     style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '14px' }}
                   />
                 </div>
-                <div style={{ marginBottom: '15px' }}>
-                  <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600' }}>Folder Type *</label>
-                  <select
-                    value={newFolder.folderType}
-                    onChange={(e) => setNewFolder({...newFolder, folderType: e.target.value})}
-                    style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '14px' }}
-                  >
-                    <option value="program_files">Program Files (All users)</option>
-                    <option value="shared">Shared (All users)</option>
-                    <option value="company_specific">Company Specific</option>
-                  </select>
-                </div>
-                {newFolder.folderType === 'company_specific' && (
-                  <div style={{ marginBottom: '20px' }}>
-                    <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600' }}>Company *</label>
-                    <select
-                      value={newFolder.companyId}
-                      onChange={(e) => setNewFolder({...newFolder, companyId: e.target.value})}
-                      required
-                      style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '14px' }}
-                    >
-                      <option value="">Select a company</option>
-                      {companies.map((company) => (
-                        <option key={company.id} value={company.id}>{company.company_name}</option>
-                      ))}
-                    </select>
-                  </div>
+
+                {!showSubfolderForm && (
+                  <>
+                    <div style={{ marginBottom: '15px' }}>
+                      <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600' }}>Folder Type *</label>
+                      <select
+                        value={newFolder.folderType}
+                        onChange={(e) => setNewFolder({...newFolder, folderType: e.target.value})}
+                        style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '14px' }}
+                      >
+                        <option value="program_files">Program Files (All users)</option>
+                        <option value="shared">Shared (All users)</option>
+                        <option value="company_specific">Company Specific</option>
+                      </select>
+                    </div>
+                    {newFolder.folderType === 'company_specific' && (
+                      <div style={{ marginBottom: '20px' }}>
+                        <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600' }}>Company *</label>
+                        <select
+                          value={newFolder.companyId}
+                          onChange={(e) => setNewFolder({...newFolder, companyId: e.target.value})}
+                          required
+                          style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '14px' }}
+                        >
+                          <option value="">Select a company</option>
+                          {companies.map((company) => (
+                            <option key={company.id} value={company.id}>{company.company_name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                  </>
                 )}
-                <button
-                  type="submit"
-                  style={{
-                    padding: '12px 24px',
-                    backgroundColor: '#B3CC48',
-                    color: '#000',
-                    border: 'none',
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                    fontSize: '14px',
-                    fontWeight: '600'
-                  }}
-                >
-                  Create Folder
-                </button>
+
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button
+                    type="submit"
+                    style={{
+                      padding: '12px 24px',
+                      backgroundColor: '#B3CC48',
+                      color: '#000',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      fontWeight: '600'
+                    }}
+                  >
+                    {showSubfolderForm ? 'Create Subfolder' : 'Create Folder'}
+                  </button>
+                  
+                  {showSubfolderForm && (
+                    <button
+                      type="button"
+                      onClick={cancelSubfolderForm}
+                      style={{
+                        padding: '12px 24px',
+                        backgroundColor: '#6c757d',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        fontSize: '14px',
+                        fontWeight: '600'
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  )}
+                </div>
               </form>
             </div>
 
@@ -719,47 +934,22 @@ export default function AdminPage() {
               borderRadius: '8px',
               boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
             }}>
-              <h2 style={{ marginTop: 0, color: '#144478' }}>Existing Folders</h2>
-              <div style={{ maxHeight: '500px', overflowY: 'auto' }}>
-                {folders.map((folder) => (
-                  <div
-                    key={folder.id}
-                    style={{
-                      padding: '15px',
-                      borderBottom: '1px solid #eee',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center'
-                    }}
-                  >
-                    <div>
-                      <div style={{ fontWeight: '600', marginBottom: '5px' }}>
-                        📁 {folder.folder_name}
-                      </div>
-                      <div style={{ fontSize: '12px', color: '#666' }}>
-                        Type: {folder.folder_type.replace('_', ' ')}
-                        {folder.company_name && ` | Company: ${folder.company_name}`}
-                      </div>
-                      <div style={{ fontSize: '11px', color: '#999', marginTop: '3px' }}>
-                        Path: {folder.blob_prefix}
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => handleDeleteFolder(folder.id, folder.folder_name)}
-                      style={{
-                        padding: '6px 12px',
-                        backgroundColor: '#dc3545',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '4px',
-                        cursor: 'pointer',
-                        fontSize: '12px'
-                      }}
-                    >
-                      Delete
-                    </button>
+              <h2 style={{ marginTop: 0, color: '#144478', marginBottom: '20px' }}>
+                Folder Hierarchy ({folders.length} total)
+              </h2>
+              <div style={{ 
+                maxHeight: '600px', 
+                overflowY: 'auto',
+                border: '1px solid #ddd',
+                borderRadius: '4px'
+              }}>
+                {folders.length === 0 ? (
+                  <div style={{ padding: '30px', textAlign: 'center', color: '#666' }}>
+                    No folders yet. Create one to get started.
                   </div>
-                ))}
+                ) : (
+                  renderFolderTree()
+                )}
               </div>
             </div>
           </div>
@@ -801,6 +991,9 @@ export default function AdminPage() {
                       <div style={{ fontWeight: '600', marginBottom: '5px' }}>{folder.folder_name}</div>
                       <div style={{ fontSize: '12px', color: '#666' }}>
                         {folder.folder_type.replace('_', ' ')}
+                        {folder.parent_folder_name && (
+                          <><br />in: {folder.parent_folder_name}</>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -825,6 +1018,23 @@ export default function AdminPage() {
                     >
                       ← Back to Folders
                     </button>
+                    
+                    {/* Breadcrumb */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '10px' }}>
+                      {getFolderPath(selectedFolder).map((folder, index, array) => (
+                        <div key={folder.id} style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                          <span style={{ 
+                            color: index === array.length - 1 ? '#144478' : '#666',
+                            fontWeight: index === array.length - 1 ? '600' : '400',
+                            fontSize: '14px'
+                          }}>
+                            {folder.folder_name}
+                          </span>
+                          {index < array.length - 1 && <span style={{ color: '#999' }}>→</span>}
+                        </div>
+                      ))}
+                    </div>
+
                     <h2 style={{ color: '#144478', margin: '10px 0 5px 0' }}>
                       📁 {selectedFolder.folder_name}
                     </h2>
