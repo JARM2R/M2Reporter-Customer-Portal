@@ -1,7 +1,7 @@
 'use client';
 
 export const dynamic = 'force-dynamic';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { signIn } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
@@ -12,11 +12,20 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [timeoutMessage, setTimeoutMessage] = useState(false);
+
+  useEffect(() => {
+    // Check if user was logged out due to timeout
+    if (searchParams.get('timeout') === 'true') {
+      setTimeoutMessage(true);
+    }
+  }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
+    setTimeoutMessage(false);
 
     try {
       const result = await signIn('credentials', {
@@ -72,6 +81,22 @@ export default function LoginPage() {
             Customer Portal
           </p>
         </div>
+
+        {/* Timeout Warning */}
+        {timeoutMessage && (
+          <div style={{
+            backgroundColor: '#fff3cd',
+            color: '#856404',
+            padding: '12px',
+            borderRadius: '4px',
+            marginBottom: '20px',
+            border: '1px solid #ffeeba',
+            fontSize: '14px',
+            textAlign: 'center'
+          }}>
+            ⏱️ Your session expired due to inactivity. Please login again.
+          </div>
+        )}
 
         <form onSubmit={handleSubmit}>
           <div style={{ marginBottom: '20px' }}>

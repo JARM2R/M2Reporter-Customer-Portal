@@ -1,4 +1,5 @@
 import SessionProvider from '@/components/SessionProvider';
+import AuthenticatedLayout from '@/components/AuthenticatedLayout';
 import './globals.css';
 
 export const metadata = {
@@ -14,7 +15,11 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <SessionProvider>{children}</SessionProvider>
+        <SessionProvider>
+          <AuthenticatedLayout>
+            {children}
+          </AuthenticatedLayout>
+        </SessionProvider>
       </body>
     </html>
   );
