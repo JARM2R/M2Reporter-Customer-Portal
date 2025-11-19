@@ -54,6 +54,7 @@ export default function AdminPage() {
   const [files, setFiles] = useState<FileItem[]>([]);
   const [selectedFolder, setSelectedFolder] = useState<Folder | null>(null);
   const [expandedFolders, setExpandedFolders] = useState<Set<number>>(new Set());
+  const [expandedFilesView, setExpandedFilesView] = useState<Set<number>>(new Set());
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
 
@@ -142,7 +143,7 @@ export default function AdminPage() {
     return folders.filter(f => f.parent_folder_id === parentId);
   };
 
-  // Toggle folder expansion
+  // Toggle folder expansion in Folders tab
   const toggleFolder = (folderId: number) => {
     const newExpanded = new Set(expandedFolders);
     if (newExpanded.has(folderId)) {
@@ -151,6 +152,17 @@ export default function AdminPage() {
       newExpanded.add(folderId);
     }
     setExpandedFolders(newExpanded);
+  };
+
+  // Toggle folder expansion in Files tab
+  const toggleFilesView = (folderId: number) => {
+    const newExpanded = new Set(expandedFilesView);
+    if (newExpanded.has(folderId)) {
+      newExpanded.delete(folderId);
+    } else {
+      newExpanded.add(folderId);
+    }
+    setExpandedFilesView(newExpanded);
   };
 
   // Get folder path for breadcrumb
@@ -408,7 +420,7 @@ export default function AdminPage() {
     return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
   };
 
-  // Render folder tree recursively
+  // Render folder tree for Folders tab
   const renderFolderTree = (parentId: number | null = null, depth: number = 0): JSX.Element[] => {
     const foldersAtLevel = parentId === null ? getRootFolders() : getSubfolders(parentId);
     
@@ -440,7 +452,8 @@ export default function AdminPage() {
                     fontSize: '12px',
                     padding: '4px',
                     width: '20px',
-                    color: '#144478'
+                    color: '#144478',
+                    fontWeight: 'bold'
                   }}
                 >
                   {isExpanded ? '▼' : '▶'}
@@ -458,7 +471,6 @@ export default function AdminPage() {
                 <div style={{ fontSize: '11px', color: '#666' }}>
                   {folder.folder_type.replace('_', ' ')}
                   {folder.company_name && ` | ${folder.company_name}`}
-                  {depth > 0 && ` | Path: ${folder.blob_prefix}`}
                 </div>
               </div>
             </div>
@@ -499,6 +511,79 @@ export default function AdminPage() {
           {isExpanded && hasSubfolders && (
             <div>
               {renderFolderTree(folder.id, depth + 1)}
+            </div>
+          )}
+        </div>
+      );
+    });
+  };
+
+  // Render folder tree for Files tab (collapsible navigation)
+  const renderFilesTreeView = (parentId: number | null = null, depth: number = 0): JSX.Element[] => {
+    const foldersAtLevel = parentId === null ? getRootFolders() : getSubfolders(parentId);
+    
+    return foldersAtLevel.map((folder) => {
+      const hasSubfolders = getSubfolders(folder.id).length > 0;
+      const isExpanded = expandedFilesView.has(folder.id);
+      const isSelected = selectedFolder?.id === folder.id;
+      
+      return (
+        <div key={folder.id}>
+          <div
+            style={{
+              padding: '10px 12px',
+              paddingLeft: `${12 + (depth * 25)}px`,
+              borderBottom: '1px solid #eee',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              backgroundColor: isSelected ? '#e7f3ff' : (depth % 2 === 0 ? 'white' : '#f8f9fa'),
+              cursor: 'pointer',
+              transition: 'background-color 0.2s'
+            }}
+            onClick={() => loadFiles(folder)}
+            onMouseEnter={(e) => {
+              if (!isSelected) e.currentTarget.style.backgroundColor = '#f0f0f0';
+            }}
+            onMouseLeave={(e) => {
+              if (!isSelected) {
+                e.currentTarget.style.backgroundColor = depth % 2 === 0 ? 'white' : '#f8f9fa';
+              }
+            }}
+          >
+            {hasSubfolders ? (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleFilesView(folder.id);
+                }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: '10px',
+                  padding: '2px',
+                  width: '18px',
+                  color: '#144478',
+                  fontWeight: 'bold'
+                }}
+              >
+                {isExpanded ? '▼' : '▶'}
+              </button>
+            ) : (
+              <span style={{ width: '18px' }}></span>
+            )}
+            
+            <span style={{ fontSize: '16px' }}>📁</span>
+            
+            <span style={{ fontWeight: isSelected ? '600' : '500', fontSize: '13px' }}>
+              {folder.folder_name}
+            </span>
+          </div>
+          
+          {isExpanded && hasSubfolders && (
+            <div>
+              {renderFilesTreeView(folder.id, depth + 1)}
             </div>
           )}
         </div>
@@ -809,7 +894,7 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* Folders Tab with Tree View */}
+        {/* Folders Tab with Nested Tree View */}
         {activeTab === 'folders' && (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '30px' }}>
             <div style={{
@@ -934,9 +1019,12 @@ export default function AdminPage() {
               borderRadius: '8px',
               boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
             }}>
-              <h2 style={{ marginTop: 0, color: '#144478', marginBottom: '20px' }}>
+              <h2 style={{ marginTop: 0, color: '#144478', marginBottom: '15px' }}>
                 Folder Hierarchy ({folders.length} total)
               </h2>
+              <div style={{ fontSize: '12px', color: '#666', marginBottom: '15px' }}>
+                Click ▶ to expand folders and reveal subfolders
+              </div>
               <div style={{ 
                 maxHeight: '600px', 
                 overflowY: 'auto',
@@ -955,72 +1043,62 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* Files Tab */}
+        {/* Files Tab with Tree Navigation */}
         {activeTab === 'files' && (
-          <div>
-            {!selectedFolder ? (
-              <div style={{
-                backgroundColor: 'white',
-                padding: '40px',
-                borderRadius: '8px',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
-              }}>
-                <h2 style={{ marginTop: 0, color: '#144478', marginBottom: '20px' }}>Select a Folder</h2>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '15px' }}>
-                  {folders.map((folder) => (
-                    <div
-                      key={folder.id}
-                      onClick={() => loadFiles(folder)}
-                      style={{
-                        padding: '20px',
-                        border: '2px solid #ddd',
-                        borderRadius: '8px',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.borderColor = '#B3CC48';
-                        e.currentTarget.style.backgroundColor = '#f8f9fa';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.borderColor = '#ddd';
-                        e.currentTarget.style.backgroundColor = 'white';
-                      }}
-                    >
-                      <div style={{ fontSize: '32px', marginBottom: '10px' }}>📁</div>
-                      <div style={{ fontWeight: '600', marginBottom: '5px' }}>{folder.folder_name}</div>
-                      <div style={{ fontSize: '12px', color: '#666' }}>
-                        {folder.folder_type.replace('_', ' ')}
-                        {folder.parent_folder_name && (
-                          <><br />in: {folder.parent_folder_name}</>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: '20px' }}>
+            {/* Left: Folder Tree Navigation */}
+            <div style={{
+              backgroundColor: 'white',
+              padding: '20px',
+              borderRadius: '8px',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+              maxHeight: '700px',
+              overflowY: 'auto'
+            }}>
+              <h3 style={{ marginTop: 0, marginBottom: '15px', color: '#144478', fontSize: '18px' }}>
+                Folders
+              </h3>
+              <div style={{ fontSize: '12px', color: '#666', marginBottom: '15px' }}>
+                Click ▶ to expand • Click folder to view files
               </div>
-            ) : (
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                  <div>
-                    <button
-                      onClick={() => { setSelectedFolder(null); setFiles([]); }}
-                      style={{
-                        padding: '8px 16px',
-                        backgroundColor: 'transparent',
-                        color: '#144478',
-                        border: '1px solid #144478',
-                        borderRadius: '4px',
-                        cursor: 'pointer',
-                        fontSize: '14px',
-                        marginBottom: '10px'
-                      }}
-                    >
-                      ← Back to Folders
-                    </button>
-                    
+              <div style={{ border: '1px solid #ddd', borderRadius: '4px' }}>
+                {folders.length === 0 ? (
+                  <div style={{ padding: '20px', textAlign: 'center', color: '#666', fontSize: '13px' }}>
+                    No folders available
+                  </div>
+                ) : (
+                  renderFilesTreeView()
+                )}
+              </div>
+            </div>
+
+            {/* Right: File Content Area */}
+            <div>
+              {!selectedFolder ? (
+                <div style={{
+                  backgroundColor: 'white',
+                  padding: '60px 40px',
+                  borderRadius: '8px',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                  textAlign: 'center'
+                }}>
+                  <div style={{ fontSize: '48px', marginBottom: '20px' }}>📁</div>
+                  <h2 style={{ color: '#144478', marginBottom: '10px' }}>Select a Folder</h2>
+                  <p style={{ color: '#666', fontSize: '14px' }}>
+                    Click a folder from the left sidebar to view and manage its files
+                  </p>
+                </div>
+              ) : (
+                <div>
+                  <div style={{
+                    backgroundColor: 'white',
+                    padding: '20px',
+                    borderRadius: '8px',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                    marginBottom: '20px'
+                  }}>
                     {/* Breadcrumb */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '15px' }}>
                       {getFolderPath(selectedFolder).map((folder, index, array) => (
                         <div key={folder.id} style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                           <span style={{ 
@@ -1035,107 +1113,111 @@ export default function AdminPage() {
                       ))}
                     </div>
 
-                    <h2 style={{ color: '#144478', margin: '10px 0 5px 0' }}>
-                      📁 {selectedFolder.folder_name}
-                    </h2>
-                    <p style={{ color: '#666', margin: 0 }}>
-                      {files.length} {files.length === 1 ? 'file' : 'files'}
-                    </p>
-                  </div>
-                  <div>
-                    <input
-                      type="file"
-                      id="admin-file-upload"
-                      onChange={handleFileUpload}
-                      disabled={uploading}
-                      style={{ display: 'none' }}
-                    />
-                    <label
-                      htmlFor="admin-file-upload"
-                      style={{
-                        padding: '12px 24px',
-                        backgroundColor: uploading ? '#ccc' : '#B3CC48',
-                        color: '#000',
-                        border: 'none',
-                        borderRadius: '4px',
-                        cursor: uploading ? 'not-allowed' : 'pointer',
-                        fontSize: '14px',
-                        fontWeight: '600',
-                        display: 'inline-block'
-                      }}
-                    >
-                      {uploading ? 'Uploading...' : '+ Upload File'}
-                    </label>
-                  </div>
-                </div>
-
-                <div style={{
-                  backgroundColor: 'white',
-                  borderRadius: '8px',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                  overflow: 'hidden'
-                }}>
-                  {files.length === 0 ? (
-                    <div style={{ padding: '40px', textAlign: 'center', color: '#666' }}>
-                      <p>No files in this folder yet.</p>
-                      <p style={{ fontSize: '14px' }}>Click "Upload File" to add files.</p>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <h2 style={{ color: '#144478', margin: '0 0 5px 0', fontSize: '20px' }}>
+                          📁 {selectedFolder.folder_name}
+                        </h2>
+                        <p style={{ color: '#666', margin: 0, fontSize: '13px' }}>
+                          {files.length} {files.length === 1 ? 'file' : 'files'}
+                        </p>
+                      </div>
+                      <div>
+                        <input
+                          type="file"
+                          id="admin-file-upload"
+                          onChange={handleFileUpload}
+                          disabled={uploading}
+                          style={{ display: 'none' }}
+                        />
+                        <label
+                          htmlFor="admin-file-upload"
+                          style={{
+                            padding: '12px 24px',
+                            backgroundColor: uploading ? '#ccc' : '#B3CC48',
+                            color: '#000',
+                            border: 'none',
+                            borderRadius: '4px',
+                            cursor: uploading ? 'not-allowed' : 'pointer',
+                            fontSize: '14px',
+                            fontWeight: '600',
+                            display: 'inline-block'
+                          }}
+                        >
+                          {uploading ? 'Uploading...' : '+ Upload File'}
+                        </label>
+                      </div>
                     </div>
-                  ) : (
-                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                      <thead>
-                        <tr style={{ backgroundColor: '#f8f9fa', borderBottom: '2px solid #dee2e6' }}>
-                          <th style={{ padding: '15px', textAlign: 'left', fontWeight: '600', color: '#333' }}>Filename</th>
-                          <th style={{ padding: '15px', textAlign: 'left', fontWeight: '600', color: '#333', width: '120px' }}>Size</th>
-                          <th style={{ padding: '15px', textAlign: 'left', fontWeight: '600', color: '#333', width: '200px' }}>Uploaded</th>
-                          <th style={{ padding: '15px', textAlign: 'center', fontWeight: '600', color: '#333', width: '200px' }}>Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {files.map((file) => (
-                          <tr key={file.url} style={{ borderBottom: '1px solid #dee2e6' }}>
-                            <td style={{ padding: '15px', color: '#333' }}>📄 {file.filename}</td>
-                            <td style={{ padding: '15px', color: '#666' }}>{formatFileSize(file.size)}</td>
-                            <td style={{ padding: '15px', color: '#666', fontSize: '13px' }}>{formatDate(file.uploadedAt)}</td>
-                            <td style={{ padding: '15px', textAlign: 'center' }}>
-                              <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-                                <button
-                                  onClick={() => handleFileDownload(file.url, file.filename)}
-                                  style={{
-                                    padding: '6px 16px',
-                                    backgroundColor: '#144478',
-                                    color: 'white',
-                                    border: 'none',
-                                    borderRadius: '4px',
-                                    cursor: 'pointer',
-                                    fontSize: '13px'
-                                  }}
-                                >
-                                  Download
-                                </button>
-                                <button
-                                  onClick={() => handleFileDelete(file.url, file.filename)}
-                                  style={{
-                                    padding: '6px 16px',
-                                    backgroundColor: '#dc3545',
-                                    color: 'white',
-                                    border: 'none',
-                                    borderRadius: '4px',
-                                    cursor: 'pointer',
-                                    fontSize: '13px'
-                                  }}
-                                >
-                                  Delete
-                                </button>
-                              </div>
-                            </td>
+                  </div>
+
+                  <div style={{
+                    backgroundColor: 'white',
+                    borderRadius: '8px',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                    overflow: 'hidden'
+                  }}>
+                    {files.length === 0 ? (
+                      <div style={{ padding: '40px', textAlign: 'center', color: '#666' }}>
+                        <p>No files in this folder yet.</p>
+                        <p style={{ fontSize: '14px' }}>Click "Upload File" to add files.</p>
+                      </div>
+                    ) : (
+                      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                        <thead>
+                          <tr style={{ backgroundColor: '#f8f9fa', borderBottom: '2px solid #dee2e6' }}>
+                            <th style={{ padding: '15px', textAlign: 'left', fontWeight: '600', color: '#333' }}>Filename</th>
+                            <th style={{ padding: '15px', textAlign: 'left', fontWeight: '600', color: '#333', width: '120px' }}>Size</th>
+                            <th style={{ padding: '15px', textAlign: 'left', fontWeight: '600', color: '#333', width: '200px' }}>Uploaded</th>
+                            <th style={{ padding: '15px', textAlign: 'center', fontWeight: '600', color: '#333', width: '200px' }}>Actions</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  )}
+                        </thead>
+                        <tbody>
+                          {files.map((file) => (
+                            <tr key={file.url} style={{ borderBottom: '1px solid #dee2e6' }}>
+                              <td style={{ padding: '15px', color: '#333' }}>📄 {file.filename}</td>
+                              <td style={{ padding: '15px', color: '#666' }}>{formatFileSize(file.size)}</td>
+                              <td style={{ padding: '15px', color: '#666', fontSize: '13px' }}>{formatDate(file.uploadedAt)}</td>
+                              <td style={{ padding: '15px', textAlign: 'center' }}>
+                                <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                                  <button
+                                    onClick={() => handleFileDownload(file.url, file.filename)}
+                                    style={{
+                                      padding: '6px 16px',
+                                      backgroundColor: '#144478',
+                                      color: 'white',
+                                      border: 'none',
+                                      borderRadius: '4px',
+                                      cursor: 'pointer',
+                                      fontSize: '13px'
+                                    }}
+                                  >
+                                    Download
+                                  </button>
+                                  <button
+                                    onClick={() => handleFileDelete(file.url, file.filename)}
+                                    style={{
+                                      padding: '6px 16px',
+                                      backgroundColor: '#dc3545',
+                                      color: 'white',
+                                      border: 'none',
+                                      borderRadius: '4px',
+                                      cursor: 'pointer',
+                                      fontSize: '13px'
+                                    }}
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         )}
       </main>
