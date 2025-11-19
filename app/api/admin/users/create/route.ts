@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
     // Send welcome email
     try {
       await resend.emails.send({
-        from: 'm2r@portal.m2reporter.com',
+        from: process.env.FROM_EMAIL || 'noreply@m2reporter.com',
         to: email,
         subject: 'Welcome to M2 Reporter Customer Portal',
         html: `

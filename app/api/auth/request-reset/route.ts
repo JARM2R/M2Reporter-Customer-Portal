@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
     const resetUrl = `https://portal.m2reporter.com/reset-password?token=${token}`;
 
     await resend.emails.send({
-      from: 'm2r@m2reporter.com',
+      from: process.env.FROM_EMAIL || 'noreply@m2reporter.com',
       to: email,
       subject: 'Reset Your M2 Reporter Password',
       html: `
