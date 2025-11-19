@@ -83,38 +83,49 @@ export function sanitizeCompanyName(name: string): string {
  * Allowed file types for upload
  */
 export const ALLOWED_FILE_TYPES = {
-  // Documents
-  'application/pdf': '.pdf',
-  'text/csv': '.csv',
-  'text/plain': '.txt',
-  'application/xml': '.xml',
-  'text/xml': '.xml',
-
-  // Spreadsheets
-  'application/vnd.ms-excel': '.xls',
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': '.xlsx',
-
-  // Word Documents
-  'application/msword': '.doc',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '.docx',
-
+  // Executables & Installers
+  'application/x-msdownload': '.exe',
+  'application/x-msdos-program': '.exe',
+  'application/x-msi': '.msi',
+  'application/x-ms-installer': '.msi',
+  
   // Database Files
   'application/x-msaccess': '.mdb',
   'application/vnd.ms-access': '.mdb',
-
-  // Executables & Installers
-  'application/x-msdownload': '.exe',
-  'application/x-msi': '.msi',
-  'application/x-ms-installer': '.msi',
-  'application/octet-stream': '.exe', // Generic binary - will validate by extension
-
-  // Images (for documentation)
-  'image/jpeg': '.jpg',
-  'image/png': '.png',
-
+  'application/msaccess': '.mdb',
+  
+  // PDF
+  'application/pdf': '.pdf',
+  
+  // Word Documents
+  'application/msword': '.doc',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '.docx',
+  
+  // Excel Files
+  'application/vnd.ms-excel': '.xls',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': '.xlsx',
+  
+  // CSV & Text
+  'text/csv': '.csv',
+  'text/plain': '.txt',
+  'text/tab-separated-values': '.tsv',
+  
+  // Report Files
+  'application/x-rpt': '.rpt',
+  
   // Archives
   'application/zip': '.zip',
   'application/x-zip-compressed': '.zip',
+  'application/x-rar-compressed': '.rar',
+  'application/x-7z-compressed': '.7z',
+  
+  // Images
+  'image/jpeg': '.jpg',
+  'image/png': '.png',
+  'image/gif': '.gif',
+  
+  // Generic binary (for executables and other binary files)
+  'application/octet-stream': '.exe', // Fallback for binary files
 } as const;
 
 /**
@@ -128,15 +139,27 @@ export function isValidFileType(mimeType: string, filename: string): {
   const fileExtension = filename.toLowerCase().split('.').pop() || '';
   const fullExtension = '.' + fileExtension;
 
+  // List of allowed extensions
+  const allowedExtensions = [
+    '.exe', '.msi',           // Executables
+    '.mdb',                   // Database
+    '.pdf',                   // PDF
+    '.doc', '.docx',          // Word
+    '.xls', '.xlsx',          // Excel
+    '.csv', '.txt', '.tsv',   // Text
+    '.rpt',                   // Reports
+    '.zip', '.rar', '.7z',    // Archives
+    '.jpg', '.jpeg', '.png', '.gif' // Images
+  ];
+
   // For generic binary MIME type, validate by extension only
   if (mimeType === 'application/octet-stream') {
-    const allowedExtensions = ['.exe', '.msi', '.zip', '.mdb'];
     if (allowedExtensions.includes(fullExtension)) {
       return { valid: true };
     }
     return {
       valid: false,
-      error: `File type .${fileExtension} not allowed for binary files.`,
+      error: `File type .${fileExtension} not allowed.`,
     };
   }
 
@@ -144,16 +167,7 @@ export function isValidFileType(mimeType: string, filename: string): {
   if (!Object.keys(ALLOWED_FILE_TYPES).includes(mimeType)) {
     return {
       valid: false,
-      error: `File type not allowed. Allowed types: PDF, CSV, TXT, XML, XLS, XLSX, DOC, DOCX, MDB, EXE, MSI, JPG, PNG, ZIP`,
-    };
-  }
-
-  // Check file extension matches MIME type
-  const expectedExtension = ALLOWED_FILE_TYPES[mimeType as keyof typeof ALLOWED_FILE_TYPES];
-  if (!filename.toLowerCase().endsWith(expectedExtension)) {
-    return {
-      valid: false,
-      error: `File extension does not match file type`,
+      error: `File type not allowed. Allowed types: EXE, MSI, MDB, PDF, DOC, DOCX, XLS, XLSX, CSV, TXT, RPT, ZIP, RAR, 7Z, JPG, PNG, GIF`,
     };
   }
 
