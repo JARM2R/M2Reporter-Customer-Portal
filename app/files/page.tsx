@@ -205,8 +205,12 @@ export default function FilesPage() {
     return null;
   }
 
+  // Admins can upload anywhere, customers can only upload to company_specific folders
   const canUpload = session.user.accountStatus === 'active' &&
-    (session.user.role === 'admin' || folder.type !== 'program_files');
+    (session.user.role === 'admin' || folder.type === 'company_specific');
+  
+  // Admins can delete anywhere, customers can delete in company_specific folders
+  const canDelete = session.user.role === 'admin' || folder.type === 'company_specific';
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5' }}>
@@ -495,7 +499,7 @@ export default function FilesPage() {
                             Download
                           </button>
                           
-                          {session.user.role === 'admin' && (
+                          {canDelete && (
                             <button
                               onClick={() => handleDelete(file.url, file.filename)}
                               style={{

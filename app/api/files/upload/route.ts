@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { handleUpload, type HandleUploadBody } from '@vercel/blob/client';
+import { sql } from '@vercel/postgres';
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   const body = (await request.json()) as HandleUploadBody;
@@ -13,10 +14,45 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // Check account status
+    if (session.user.accountStatus !== 'active') {
+      return NextResponse.json({ 
+        error: 'Account access restricted. Please contact support.' 
+      }, { status: 403 });
+    }
+
     const jsonResponse = await handleUpload({
       body,
       request,
       onBeforeGenerateToken: async (pathname, clientPayload) => {
+        // Extract folder from pathname to check permissions
+        // pathname format: "folder-prefix/filename.ext"
+        const folderPrefix = pathname.substring(0, pathname.lastIndexOf('/') + 1);
+
+        // Get folder information
+        const folderCheck = await sql`
+          SELECT fp.id, fp.folder_type, fp.company_id
+          FROM file_permissions fp
+          WHERE fp.blob_prefix = ${folderPrefix}
+        `;
+
+        if (folderCheck.rows.length === 0) {
+          throw new Error('Invalid folder');
+        }
+
+        const folder = folderCheck.rows[0];
+
+        // Permission check:
+        // - Admins can upload anywhere
+        // - Customers can only upload to company_specific folders (and it must be their company)
+        const isAdmin = session.user.role === 'admin';
+        const isOwnCompanyFolder = folder.folder_type === 'company_specific' && 
+                                    folder.company_id === session.user.companyId;
+
+        if (!isAdmin && !isOwnCompanyFolder) {
+          throw new Error('You do not have permission to upload files to this folder');
+        }
+
         // Comprehensive list of allowed file types
         const allowedTypes = [
           // Executables & Installers
@@ -66,13 +102,31 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
         return {
           allowedContentTypes: allowedTypes,
-          maximumSizeInBytes: 500 * 1024 * 1024, // 500MB (increased from 100MB)
+          maximumSizeInBytes: 500 * 1024 * 1024, // 500MB
           allowOverwrite: true,
         };
       },
 
       onUploadCompleted: async ({ blob, tokenPayload }) => {
-        // Optional: Save file metadata to database
+        // Audit log
+        await sql`
+          INSERT INTO audit_log (
+            user_id,
+            action,
+            resource_type,
+            resource_id,
+            ip_address,
+            user_agent
+          )
+          VALUES (
+            ${session.user.id},
+            'FILE_UPLOADED',
+            'file',
+            ${blob.url},
+            ${request.headers.get('x-forwarded-for') || 'unknown'},
+            ${request.headers.get('user-agent') || 'unknown'}
+          )
+        `;
         console.log('Upload completed:', blob.url);
       },
     });
