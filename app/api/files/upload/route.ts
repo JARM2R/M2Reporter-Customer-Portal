@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth/react';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 import { handleUpload, type HandleUploadBody } from '@vercel/blob/client';
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
@@ -7,7 +8,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   try {
     // Verify user is authenticated
-    const session = await getServerSession();
+    const session = await getServerSession(authOptions);
     if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
