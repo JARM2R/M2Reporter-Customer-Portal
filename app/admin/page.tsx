@@ -4,6 +4,7 @@ import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { upload } from '@vercel/blob/client';
+import { generateStrongPassword, getPasswordStrength } from '@/lib/passwordUtils';
 
 interface Company {
   id: number;
@@ -67,6 +68,9 @@ export default function AdminPage() {
     companyId: '',
     role: 'customer'
   });
+  const [suggestedPassword, setSuggestedPassword] = useState('');
+   const [showPasswordSuggestion, setShowPasswordSuggestion] = useState(false);
+   const [copiedPassword, setCopiedPassword] = useState(false);
   const [newFolder, setNewFolder] = useState({
     folderName: '',
     folderType: 'company_specific',
@@ -133,6 +137,36 @@ export default function AdminPage() {
     }
   };
 
+// ⬇️ ADD THESE FUNCTIONS HERE ⬇️
+  // Password generator functions
+  const handleGeneratePassword = () => {
+    const password = generateStrongPassword(16);
+    setSuggestedPassword(password);
+    setShowPasswordSuggestion(true);
+    setCopiedPassword(false);
+  };
+
+  const handleUseSuggestedPassword = () => {
+    setNewUser({...newUser, password: suggestedPassword});
+    setShowPasswordSuggestion(false);
+    alert('Password applied! Remember to save it before creating the user.');
+  };
+
+  const handleCopyPassword = async () => {
+    try {
+      await navigator.clipboard.writeText(suggestedPassword);
+      setCopiedPassword(true);
+      setTimeout(() => setCopiedPassword(false), 2000);
+    } catch (err) {
+      alert('Failed to copy password');
+    }
+  };
+
+  const passwordStrength = getPasswordStrength(newUser.password);
+  // ⬆️ ADD ABOVE FUNCTIONS HERE ⬆️
+
+  // Then continues with your existing functions...
+  const handleCreateCompany = async (e: React.FormEvent) => {
   // Get root folders (no parent)
   const getRootFolders = () => {
     return folders.filter(f => !f.parent_folder_id);
@@ -780,7 +814,8 @@ export default function AdminPage() {
                     style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '14px' }}
                   />
                 </div>
-                <div style={{ marginBottom: '15px' }}>
+				
+				<div style={{ marginBottom: '15px' }}>
                   <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600' }}>Email *</label>
                   <input
                     type="email"
@@ -790,16 +825,131 @@ export default function AdminPage() {
                     style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '14px' }}
                   />
                 </div>
+				
+                {/* PASSWORD SECTION WITH GENERATOR */}
                 <div style={{ marginBottom: '15px' }}>
-                  <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600' }}>Password *</label>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' }}>
+                    <label style={{ fontWeight: '600' }}>Password *</label>
+                    <button
+                      type="button"
+                      onClick={handleGeneratePassword}
+                      style={{
+                        padding: '6px 12px',
+                        backgroundColor: '#17a2b8',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        fontSize: '12px',
+                        fontWeight: '600'
+                      }}
+                    >
+                      🔑 Generate Password
+                    </button>
+                  </div>
                   <input
-                    type="password"
+                    type="text"
                     value={newUser.password}
                     onChange={(e) => setNewUser({...newUser, password: e.target.value})}
                     required
                     style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '14px' }}
                   />
+                  
+                  {/* Password Strength Indicator */}
+                  {newUser.password && (
+                    <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <div style={{ flex: 1, height: '6px', backgroundColor: '#e9ecef', borderRadius: '3px', overflow: 'hidden' }}>
+                        <div style={{ 
+                          width: `${(passwordStrength.score / 7) * 100}%`, 
+                          height: '100%', 
+                          backgroundColor: passwordStrength.color,
+                          transition: 'width 0.3s'
+                        }} />
+                      </div>
+                      <span style={{ fontSize: '12px', fontWeight: '600', color: passwordStrength.color }}>
+                        {passwordStrength.label}
+                      </span>
+                    </div>
+                  )}
                 </div>
+
+                {/* Password Suggestion Box */}
+                {showPasswordSuggestion && (
+                  <div style={{
+                    backgroundColor: '#f8f9fa',
+                    border: '2px solid #17a2b8',
+                    borderRadius: '8px',
+                    padding: '15px',
+                    marginBottom: '15px'
+                  }}>
+                    <div style={{ fontWeight: '600', marginBottom: '8px', color: '#144478', fontSize: '14px' }}>
+                      💡 Suggested Strong Password:
+                    </div>
+                    <div style={{
+                      backgroundColor: 'white',
+                      padding: '10px',
+                      borderRadius: '4px',
+                      fontFamily: 'monospace',
+                      fontSize: '14px',
+                      wordBreak: 'break-all',
+                      marginBottom: '10px',
+                      border: '1px solid #ddd'
+                    }}>
+                      {suggestedPassword}
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button
+                        type="button"
+                        onClick={handleUseSuggestedPassword}
+                        style={{
+                          flex: 1,
+                          padding: '8px 16px',
+                          backgroundColor: '#28a745',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          fontSize: '13px',
+                          fontWeight: '600'
+                        }}
+                      >
+                        ✓ Use This Password
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleCopyPassword}
+                        style={{
+                          padding: '8px 16px',
+                          backgroundColor: copiedPassword ? '#6c757d' : '#17a2b8',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          fontSize: '13px',
+                          fontWeight: '600'
+                        }}
+                      >
+                        {copiedPassword ? '✓ Copied!' : '📋 Copy'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowPasswordSuggestion(false)}
+                        style={{
+                          padding: '8px 16px',
+                          backgroundColor: '#6c757d',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          fontSize: '13px'
+                        }}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+                )}
+               
                 <div style={{ marginBottom: '15px' }}>
                   <label style={{ display: 'block', marginBottom: '5px', fontWeight: '600' }}>Company *</label>
                   <select
