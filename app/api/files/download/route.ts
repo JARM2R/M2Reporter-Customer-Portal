@@ -32,15 +32,28 @@ export async function GET(req: NextRequest) {
     const blobPath = domainIndex !== -1 ? urlParts.slice(domainIndex + 1).join('/') : fileUrl.split('/').pop() || '';
 
     // Verify user has access to this file path
-    const accessCheck = await sql`
-      SELECT fp.id, fp.folder_name
-      FROM file_permissions fp
-      WHERE (
-        fp.folder_type IN ('shared', 'program_files')
-        OR fp.company_id = ${session.user.companyId}
-      )
-      AND ${blobPath} LIKE fp.blob_prefix || '%'
-    `;
+    const isAdmin = session.user.role === 'admin';
+
+    let accessCheck;
+    if (isAdmin) {
+      // Admins can download any file
+      accessCheck = await sql`
+        SELECT fp.id, fp.folder_name
+        FROM file_permissions fp
+        WHERE ${blobPath} LIKE fp.blob_prefix || '%'
+      `;
+    } else {
+      // Non-admins can only download from shared, program_files, or their company's folders
+      accessCheck = await sql`
+        SELECT fp.id, fp.folder_name
+        FROM file_permissions fp
+        WHERE (
+          fp.folder_type IN ('shared', 'program_files')
+          OR fp.company_id = ${session.user.companyId}
+        )
+        AND ${blobPath} LIKE fp.blob_prefix || '%'
+      `;
+    }
 
     if (accessCheck.rows.length === 0) {
       return NextResponse.json({ error: 'Access denied to this file' }, { status: 403 });
