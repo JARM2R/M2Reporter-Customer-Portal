@@ -26,20 +26,50 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Folder ID required' }, { status: 400 });
     }
 
-    // Get folder permissions
-    const folderResult = await sql`
-      SELECT fp.*, c.company_name
-      FROM file_permissions fp
-      LEFT JOIN companies c ON fp.company_id = c.id
-      WHERE fp.id = ${folderId}
-      AND (
-        fp.folder_type IN ('shared', 'program_files')
-        OR fp.company_id = ${session.user.companyId}
-      )
-    `;
+    // Get folder details - admins can access any folder
+    const isAdmin = session.user.role === 'admin';
+
+    console.log('Auth debug:', {
+      userId: session.user.id,
+      role: session.user.role,
+      isAdmin,
+      companyId: session.user.companyId,
+      requestedFolderId: folderId
+    });
+
+    let folderResult;
+    if (isAdmin) {
+      // Admins can access any folder
+      folderResult = await sql`
+        SELECT fp.*, c.company_name
+        FROM file_permissions fp
+        LEFT JOIN companies c ON fp.company_id = c.id
+        WHERE fp.id = ${folderId}
+      `;
+    } else {
+      // Non-admins can only access shared, program_files, or their company's folders
+      folderResult = await sql`
+        SELECT fp.*, c.company_name
+        FROM file_permissions fp
+        LEFT JOIN companies c ON fp.company_id = c.id
+        WHERE fp.id = ${folderId}
+        AND (
+          fp.folder_type IN ('shared', 'program_files')
+          OR fp.company_id = ${session.user.companyId}
+        )
+      `;
+    }
 
     if (folderResult.rows.length === 0) {
-      return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+      return NextResponse.json({
+        error: 'Access denied',
+        debug: {
+          role: session.user.role,
+          isAdmin,
+          companyId: session.user.companyId,
+          requestedFolderId: folderId
+        }
+      }, { status: 403 });
     }
 
     const folder = folderResult.rows[0];
@@ -50,11 +80,20 @@ export async function GET(req: NextRequest) {
       limit: 1000
     });
 
+    // Debug logging
+    console.log('File list debug:', {
+      folderId,
+      folderName: folder.folder_name,
+      blobPrefix: folder.blob_prefix,
+      totalBlobs: blobs.length,
+      blobPaths: blobs.map(b => b.pathname)
+    });
+
     // Filter to only include files directly in this folder (not in subfolders)
     const filesInThisFolder = blobs.filter(blob => {
       // Remove the folder prefix from the blob pathname
       const relativePath = blob.pathname.replace(folder.blob_prefix, '');
-      
+
       // If there are any "/" characters in the relative path, it's in a subfolder
       // We only want files directly in this folder
       return relativePath && !relativePath.includes('/');
@@ -78,7 +117,12 @@ export async function GET(req: NextRequest) {
         companyName: folder.company_name,
         blobPrefix: folder.blob_prefix
       },
-      files
+      files,
+      debug: {
+        totalBlobsFound: blobs.length,
+        blobPaths: blobs.slice(0, 10).map(b => b.pathname),
+        filteredCount: filesInThisFolder.length
+      }
     });
 
   } catch (error) {
