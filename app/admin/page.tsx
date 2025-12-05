@@ -89,6 +89,12 @@ export default function AdminPage() {
   const [showSubfolderForm, setShowSubfolderForm] = useState(false);
   const [subfolderParent, setSubfolderParent] = useState<Folder | null>(null);
 
+  // Search states
+  const [companySearch, setCompanySearch] = useState('');
+  const [userSearch, setUserSearch] = useState('');
+  const [folderSearch, setFolderSearch] = useState('');
+  const [filesFolderSearch, setFilesFolderSearch] = useState('');
+
   useEffect(() => {
     if (status === 'unauthenticated') {
       router.replace('/login');
@@ -151,6 +157,36 @@ export default function AdminPage() {
       setFiles([]);
     }
   };
+
+  // Filtered data based on search
+  const filteredCompanies = companies.filter(company =>
+    company.company_name.toLowerCase().includes(companySearch.toLowerCase())
+  );
+
+  const filteredUsers = users.filter(user => {
+    const searchLower = userSearch.toLowerCase();
+    return (
+      user.username.toLowerCase().includes(searchLower) ||
+      user.email.toLowerCase().includes(searchLower) ||
+      user.company_name?.toLowerCase().includes(searchLower)
+    );
+  });
+
+  const filteredFolders = folders.filter(folder => {
+    const searchLower = folderSearch.toLowerCase();
+    return (
+      folder.folder_name.toLowerCase().includes(searchLower) ||
+      folder.company_name?.toLowerCase().includes(searchLower)
+    );
+  });
+
+  const filteredFilesFolders = folders.filter(folder => {
+    const searchLower = filesFolderSearch.toLowerCase();
+    return (
+      folder.folder_name.toLowerCase().includes(searchLower) ||
+      folder.company_name?.toLowerCase().includes(searchLower)
+    );
+  });
 
 // ⬇️ ADD THESE FUNCTIONS HERE ⬇️
   // Password generator functions
@@ -809,8 +845,27 @@ export default function AdminPage() {
               boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
             }}>
               <h2 style={{ marginTop: 0, color: '#144478' }}>Existing Companies</h2>
+              <div style={{ marginBottom: '15px' }}>
+                <input
+                  type="text"
+                  placeholder="Search companies..."
+                  value={companySearch}
+                  onChange={(e) => setCompanySearch(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    border: '1px solid #ddd',
+                    borderRadius: '4px',
+                    fontSize: '14px'
+                  }}
+                />
+              </div>
               <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
-                {companies.map((company) => (
+                {filteredCompanies.length === 0 ? (
+                  <div style={{ padding: '20px', textAlign: 'center', color: '#666' }}>
+                    {companySearch ? 'No companies match your search' : 'No companies yet'}
+                  </div>
+                ) : filteredCompanies.map((company) => (
                   <div
                     key={company.id}
                     style={{
@@ -1057,8 +1112,27 @@ export default function AdminPage() {
               boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
             }}>
               <h2 style={{ marginTop: 0, color: '#144478' }}>Existing Users</h2>
+              <div style={{ marginBottom: '15px' }}>
+                <input
+                  type="text"
+                  placeholder="Search by username, email, or company..."
+                  value={userSearch}
+                  onChange={(e) => setUserSearch(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    border: '1px solid #ddd',
+                    borderRadius: '4px',
+                    fontSize: '14px'
+                  }}
+                />
+              </div>
               <div style={{ maxHeight: '500px', overflowY: 'auto' }}>
-                {users.map((user) => (
+                {filteredUsers.length === 0 ? (
+                  <div style={{ padding: '20px', textAlign: 'center', color: '#666' }}>
+                    {userSearch ? 'No users match your search' : 'No users yet'}
+                  </div>
+                ) : filteredUsers.map((user) => (
                   <div
                     key={user.id}
                     style={{
@@ -1229,16 +1303,94 @@ export default function AdminPage() {
               <h2 style={{ marginTop: 0, color: '#144478', marginBottom: '15px' }}>
                 Folder Hierarchy ({folders.length} total)
               </h2>
-              <div style={{ fontSize: '12px', color: '#666', marginBottom: '15px' }}>
-                Click ▶ to expand folders and reveal subfolders
+              <div style={{ marginBottom: '15px' }}>
+                <input
+                  type="text"
+                  placeholder="Search folders by name or company..."
+                  value={folderSearch}
+                  onChange={(e) => setFolderSearch(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    border: '1px solid #ddd',
+                    borderRadius: '4px',
+                    fontSize: '14px'
+                  }}
+                />
               </div>
-              <div style={{ 
-                maxHeight: '600px', 
+              <div style={{ fontSize: '12px', color: '#666', marginBottom: '15px' }}>
+                {folderSearch ? 'Showing matching folders' : 'Click ▶ to expand folders and reveal subfolders'}
+              </div>
+              <div style={{
+                maxHeight: '600px',
                 overflowY: 'auto',
                 border: '1px solid #ddd',
                 borderRadius: '4px'
               }}>
-                {folders.length === 0 ? (
+                {folderSearch ? (
+                  filteredFolders.length === 0 ? (
+                    <div style={{ padding: '30px', textAlign: 'center', color: '#666' }}>
+                      No folders match your search
+                    </div>
+                  ) : (
+                    filteredFolders.map((folder) => (
+                      <div
+                        key={folder.id}
+                        style={{
+                          padding: '12px 15px',
+                          borderBottom: '1px solid #eee',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
+                          <span style={{ fontSize: '18px' }}>📁</span>
+                          <div>
+                            <div style={{ fontWeight: '600', marginBottom: '2px', fontSize: '14px' }}>
+                              {folder.folder_name}
+                            </div>
+                            <div style={{ fontSize: '11px', color: '#666' }}>
+                              {folder.folder_type.replace('_', ' ')}
+                              {folder.company_name && ` | ${folder.company_name}`}
+                            </div>
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button
+                            onClick={() => handleCreateSubfolder(folder)}
+                            style={{
+                              padding: '6px 12px',
+                              backgroundColor: '#B3CC48',
+                              color: '#000',
+                              border: 'none',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              fontSize: '12px',
+                              fontWeight: '600'
+                            }}
+                          >
+                            + Subfolder
+                          </button>
+                          <button
+                            onClick={() => handleDeleteFolder(folder.id, folder.folder_name)}
+                            style={{
+                              padding: '6px 12px',
+                              backgroundColor: '#dc3545',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              fontSize: '12px'
+                            }}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )
+                ) : folders.length === 0 ? (
                   <div style={{ padding: '30px', textAlign: 'center', color: '#666' }}>
                     No folders yet. Create one to get started.
                   </div>
@@ -1265,11 +1417,58 @@ export default function AdminPage() {
               <h3 style={{ marginTop: 0, marginBottom: '15px', color: '#144478', fontSize: '18px' }}>
                 Folders
               </h3>
+              <div style={{ marginBottom: '15px' }}>
+                <input
+                  type="text"
+                  placeholder="Search folders..."
+                  value={filesFolderSearch}
+                  onChange={(e) => setFilesFolderSearch(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '8px',
+                    border: '1px solid #ddd',
+                    borderRadius: '4px',
+                    fontSize: '13px'
+                  }}
+                />
+              </div>
               <div style={{ fontSize: '12px', color: '#666', marginBottom: '15px' }}>
-                Click ▶ to expand • Click folder to view files
+                {filesFolderSearch ? 'Click folder to view files' : 'Click ▶ to expand • Click folder to view files'}
               </div>
               <div style={{ border: '1px solid #ddd', borderRadius: '4px' }}>
-                {folders.length === 0 ? (
+                {filesFolderSearch ? (
+                  filteredFilesFolders.length === 0 ? (
+                    <div style={{ padding: '20px', textAlign: 'center', color: '#666', fontSize: '13px' }}>
+                      No folders match your search
+                    </div>
+                  ) : (
+                    filteredFilesFolders.map((folder) => (
+                      <div
+                        key={folder.id}
+                        style={{
+                          padding: '10px 12px',
+                          borderBottom: '1px solid #eee',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          backgroundColor: selectedFolder?.id === folder.id ? '#e7f3ff' : 'white',
+                          cursor: 'pointer'
+                        }}
+                        onClick={() => loadFiles(folder)}
+                      >
+                        <span style={{ fontSize: '16px' }}>📁</span>
+                        <div>
+                          <span style={{ fontWeight: selectedFolder?.id === folder.id ? '600' : '500', fontSize: '13px' }}>
+                            {folder.folder_name}
+                          </span>
+                          {folder.company_name && (
+                            <div style={{ fontSize: '11px', color: '#666' }}>{folder.company_name}</div>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  )
+                ) : folders.length === 0 ? (
                   <div style={{ padding: '20px', textAlign: 'center', color: '#666', fontSize: '13px' }}>
                     No folders available
                   </div>
