@@ -33,7 +33,8 @@ export async function GET(req: NextRequest) {
       LEFT JOIN companies c ON fp.company_id = c.id
       WHERE fp.id = ${folderId}
       AND (
-        fp.folder_type IN ('shared', 'program_files')
+        ${session.user.role} = 'admin'
+        OR fp.folder_type IN ('shared', 'program_files')
         OR fp.company_id = ${session.user.companyId}
       )
     `;
