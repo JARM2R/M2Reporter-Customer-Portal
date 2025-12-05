@@ -44,6 +44,12 @@ interface FileItem {
   uploadedAt: string;
 }
 
+interface PreviewFile {
+  url: string;
+  filename: string;
+  type: 'image' | 'pdf' | 'text' | 'unsupported';
+}
+
 export default function AdminPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -58,6 +64,9 @@ export default function AdminPage() {
   const [expandedFilesView, setExpandedFilesView] = useState<Set<number>>(new Set());
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [previewFile, setPreviewFile] = useState<PreviewFile | null>(null);
+  const [previewContent, setPreviewContent] = useState<string>('');
+  const [previewLoading, setPreviewLoading] = useState(false);
 
   // Form states
   const [newCompanyName, setNewCompanyName] = useState('');
@@ -166,7 +175,7 @@ export default function AdminPage() {
   // ⬆️ ADD ABOVE FUNCTIONS HERE ⬆️
 
   // Then continues with your existing functions...
-  const handleCreateCompany = async (e: React.FormEvent) => {
+
   // Get root folders (no parent)
   const getRootFolders = () => {
     return folders.filter(f => !f.parent_folder_id);
@@ -441,6 +450,48 @@ export default function AdminPage() {
     } else {
       alert(data.error || 'Failed to delete file');
     }
+  };
+
+  // Determine file type for preview
+  const getFileType = (filename: string): 'image' | 'pdf' | 'text' | 'unsupported' => {
+    const ext = filename.toLowerCase().split('.').pop() || '';
+    const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'];
+    const textExts = ['txt', 'csv', 'log', 'json', 'xml', 'md', 'html', 'css', 'js', 'ts', 'tsx', 'jsx'];
+
+    if (imageExts.includes(ext)) return 'image';
+    if (ext === 'pdf') return 'pdf';
+    if (textExts.includes(ext)) return 'text';
+    return 'unsupported';
+  };
+
+  const handleFileView = async (fileUrl: string, filename: string) => {
+    const fileType = getFileType(filename);
+
+    setPreviewFile({ url: fileUrl, filename, type: fileType });
+    setPreviewContent('');
+    setPreviewLoading(true);
+
+    if (fileType === 'text') {
+      try {
+        const response = await fetch(`/api/files/download?url=${encodeURIComponent(fileUrl)}`);
+        if (response.ok) {
+          const text = await response.text();
+          setPreviewContent(text);
+        } else {
+          setPreviewContent('Failed to load file content');
+        }
+      } catch (error) {
+        console.error('Preview error:', error);
+        setPreviewContent('Failed to load file content');
+      }
+    }
+
+    setPreviewLoading(false);
+  };
+
+  const closePreview = () => {
+    setPreviewFile(null);
+    setPreviewContent('');
   };
 
   const formatFileSize = (bytes: number) => {
@@ -1330,6 +1381,20 @@ export default function AdminPage() {
                               <td style={{ padding: '15px', textAlign: 'center' }}>
                                 <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
                                   <button
+                                    onClick={() => handleFileView(file.url, file.filename)}
+                                    style={{
+                                      padding: '6px 16px',
+                                      backgroundColor: '#17a2b8',
+                                      color: 'white',
+                                      border: 'none',
+                                      borderRadius: '4px',
+                                      cursor: 'pointer',
+                                      fontSize: '13px'
+                                    }}
+                                  >
+                                    View
+                                  </button>
+                                  <button
                                     onClick={() => handleFileDownload(file.url, file.filename)}
                                     style={{
                                       padding: '6px 16px',
@@ -1371,6 +1436,172 @@ export default function AdminPage() {
           </div>
         )}
       </main>
+
+      {/* File Preview Modal */}
+      {previewFile && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000
+          }}
+          onClick={closePreview}
+        >
+          <div
+            style={{
+              backgroundColor: 'white',
+              borderRadius: '8px',
+              maxWidth: '90vw',
+              maxHeight: '90vh',
+              width: previewFile.type === 'pdf' ? '900px' : previewFile.type === 'image' ? 'auto' : '800px',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div
+              style={{
+                padding: '15px 20px',
+                borderBottom: '1px solid #dee2e6',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                backgroundColor: '#144478',
+                color: 'white'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={{ fontSize: '20px' }}>
+                  {previewFile.type === 'image' ? '🖼️' : previewFile.type === 'pdf' ? '📕' : previewFile.type === 'text' ? '📄' : '📁'}
+                </span>
+                <span style={{ fontWeight: '600', fontSize: '16px' }}>{previewFile.filename}</span>
+              </div>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button
+                  onClick={() => handleFileDownload(previewFile.url, previewFile.filename)}
+                  style={{
+                    padding: '8px 16px',
+                    backgroundColor: '#B3CC48',
+                    color: '#000',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                    fontWeight: '600'
+                  }}
+                >
+                  Download
+                </button>
+                <button
+                  onClick={closePreview}
+                  style={{
+                    padding: '8px 16px',
+                    backgroundColor: 'transparent',
+                    color: 'white',
+                    border: '1px solid white',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                    fontWeight: '600'
+                  }}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Content */}
+            <div
+              style={{
+                flex: 1,
+                overflow: 'auto',
+                padding: previewFile.type === 'unsupported' ? '40px' : '0',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: previewFile.type === 'text' ? '#1e1e1e' : '#f5f5f5'
+              }}
+            >
+              {previewLoading ? (
+                <div style={{ padding: '40px', textAlign: 'center' }}>
+                  <div style={{ fontSize: '24px', marginBottom: '10px' }}>Loading...</div>
+                </div>
+              ) : previewFile.type === 'image' ? (
+                <img
+                  src={previewFile.url}
+                  alt={previewFile.filename}
+                  style={{
+                    maxWidth: '100%',
+                    maxHeight: 'calc(90vh - 80px)',
+                    objectFit: 'contain'
+                  }}
+                />
+              ) : previewFile.type === 'pdf' ? (
+                <iframe
+                  src={previewFile.url}
+                  style={{
+                    width: '100%',
+                    height: 'calc(90vh - 80px)',
+                    border: 'none'
+                  }}
+                  title={previewFile.filename}
+                />
+              ) : previewFile.type === 'text' ? (
+                <pre
+                  style={{
+                    width: '100%',
+                    height: 'calc(90vh - 80px)',
+                    margin: 0,
+                    padding: '20px',
+                    overflow: 'auto',
+                    backgroundColor: '#1e1e1e',
+                    color: '#d4d4d4',
+                    fontFamily: 'Consolas, Monaco, "Courier New", monospace',
+                    fontSize: '13px',
+                    lineHeight: '1.5',
+                    whiteSpace: 'pre-wrap',
+                    wordWrap: 'break-word'
+                  }}
+                >
+                  {previewContent}
+                </pre>
+              ) : (
+                <div style={{ textAlign: 'center', padding: '40px' }}>
+                  <div style={{ fontSize: '64px', marginBottom: '20px' }}>📁</div>
+                  <h3 style={{ color: '#333', marginBottom: '10px' }}>Preview Not Available</h3>
+                  <p style={{ color: '#666', marginBottom: '20px' }}>
+                    This file type cannot be previewed in the browser.
+                  </p>
+                  <button
+                    onClick={() => handleFileDownload(previewFile.url, previewFile.filename)}
+                    style={{
+                      padding: '12px 24px',
+                      backgroundColor: '#144478',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      fontWeight: '600'
+                    }}
+                  >
+                    Download File
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
