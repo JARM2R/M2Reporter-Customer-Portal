@@ -147,6 +147,8 @@ export default function AdminPage() {
       console.log('API response:', data);
       if (data.success) {
         setFiles(data.files);
+      } else {
+        console.error('API error:', data.error, 'Debug:', data.debug);
       }
     } catch (error) {
       console.error('Error loading files:', error);

@@ -29,6 +29,14 @@ export async function GET(req: NextRequest) {
     // Get folder details - admins can access any folder
     const isAdmin = session.user.role === 'admin';
 
+    console.log('Auth debug:', {
+      userId: session.user.id,
+      role: session.user.role,
+      isAdmin,
+      companyId: session.user.companyId,
+      requestedFolderId: folderId
+    });
+
     let folderResult;
     if (isAdmin) {
       // Admins can access any folder
@@ -53,7 +61,15 @@ export async function GET(req: NextRequest) {
     }
 
     if (folderResult.rows.length === 0) {
-      return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+      return NextResponse.json({
+        error: 'Access denied',
+        debug: {
+          role: session.user.role,
+          isAdmin,
+          companyId: session.user.companyId,
+          requestedFolderId: folderId
+        }
+      }, { status: 403 });
     }
 
     const folder = folderResult.rows[0];
