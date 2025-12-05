@@ -139,10 +139,16 @@ export default function AdminPage() {
 
   const loadFiles = async (folder: Folder) => {
     setSelectedFolder(folder);
-    const response = await fetch(`/api/files/list?folderId=${folder.id}`);
-    const data = await response.json();
-    if (data.success) {
-      setFiles(data.files);
+    setFiles([]); // Clear files immediately when switching folders
+    try {
+      const response = await fetch(`/api/files/list?folderId=${folder.id}`);
+      const data = await response.json();
+      if (data.success) {
+        setFiles(data.files);
+      }
+    } catch (error) {
+      console.error('Error loading files:', error);
+      setFiles([]);
     }
   };
 
