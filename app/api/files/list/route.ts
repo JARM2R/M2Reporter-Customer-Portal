@@ -26,18 +26,31 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Folder ID required' }, { status: 400 });
     }
 
-    // Get folder permissions
-    const folderResult = await sql`
-      SELECT fp.*, c.company_name
-      FROM file_permissions fp
-      LEFT JOIN companies c ON fp.company_id = c.id
-      WHERE fp.id = ${folderId}
-      AND (
-        ${session.user.role} = 'admin'
-        OR fp.folder_type IN ('shared', 'program_files')
-        OR fp.company_id = ${session.user.companyId}
-      )
-    `;
+    // Get folder details - admins can access any folder
+    const isAdmin = session.user.role === 'admin';
+
+    let folderResult;
+    if (isAdmin) {
+      // Admins can access any folder
+      folderResult = await sql`
+        SELECT fp.*, c.company_name
+        FROM file_permissions fp
+        LEFT JOIN companies c ON fp.company_id = c.id
+        WHERE fp.id = ${folderId}
+      `;
+    } else {
+      // Non-admins can only access shared, program_files, or their company's folders
+      folderResult = await sql`
+        SELECT fp.*, c.company_name
+        FROM file_permissions fp
+        LEFT JOIN companies c ON fp.company_id = c.id
+        WHERE fp.id = ${folderId}
+        AND (
+          fp.folder_type IN ('shared', 'program_files')
+          OR fp.company_id = ${session.user.companyId}
+        )
+      `;
+    }
 
     if (folderResult.rows.length === 0) {
       return NextResponse.json({ error: 'Access denied' }, { status: 403 });
