@@ -64,11 +64,20 @@ export async function GET(req: NextRequest) {
       limit: 1000
     });
 
+    // Debug logging
+    console.log('File list debug:', {
+      folderId,
+      folderName: folder.folder_name,
+      blobPrefix: folder.blob_prefix,
+      totalBlobs: blobs.length,
+      blobPaths: blobs.map(b => b.pathname)
+    });
+
     // Filter to only include files directly in this folder (not in subfolders)
     const filesInThisFolder = blobs.filter(blob => {
       // Remove the folder prefix from the blob pathname
       const relativePath = blob.pathname.replace(folder.blob_prefix, '');
-      
+
       // If there are any "/" characters in the relative path, it's in a subfolder
       // We only want files directly in this folder
       return relativePath && !relativePath.includes('/');
@@ -92,7 +101,12 @@ export async function GET(req: NextRequest) {
         companyName: folder.company_name,
         blobPrefix: folder.blob_prefix
       },
-      files
+      files,
+      debug: {
+        totalBlobsFound: blobs.length,
+        blobPaths: blobs.slice(0, 10).map(b => b.pathname),
+        filteredCount: filesInThisFolder.length
+      }
     });
 
   } catch (error) {

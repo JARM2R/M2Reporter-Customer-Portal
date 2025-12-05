@@ -141,8 +141,10 @@ export default function AdminPage() {
     setSelectedFolder(folder);
     setFiles([]); // Clear files immediately when switching folders
     try {
+      console.log('Loading files for folder:', folder.id, folder.folder_name, 'blob_prefix:', folder.blob_prefix);
       const response = await fetch(`/api/files/list?folderId=${folder.id}`);
       const data = await response.json();
+      console.log('API response:', data);
       if (data.success) {
         setFiles(data.files);
       }
