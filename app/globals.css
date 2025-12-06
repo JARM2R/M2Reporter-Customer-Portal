@@ -23,3 +23,14 @@ a {
 button {
   font-family: inherit;
 }
+
+/* Hide browser's default password reveal button */
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear {
+  display: none;
+}
+
+input::-ms-reveal,
+input::-ms-clear {
+  display: none;
+}
